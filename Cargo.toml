@@ -14,3 +14,6 @@ path = "bin/tunnel.rs"
 tokio = { version = "1.11.0", features = ["full"]}
 tun = { version = "0.5.3", features = ["async"]}
 ipnet = { version = "2.3.1" }
+etherparse = "0.9.0"
+log4rs = "1.0.0"
+log = "0.4.14"
