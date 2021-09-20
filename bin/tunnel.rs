@@ -1,5 +1,12 @@
+use std::{error::Error, io};
+
+use tokio::{ runtime::Builder };
+use tunnel::{Tun};
 fn main() {
-    
-    let config = tun::Configuration::default();
-    tun::create_as_async(&config);
+    let builder = Builder::new_multi_thread().enable_all().build().unwrap();
+    builder.block_on(async {
+        let mut tun = Tun::new().unwrap();
+        tun.run().await
+    });
+    ()
 }
