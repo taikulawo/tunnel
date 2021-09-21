@@ -4,7 +4,9 @@ use etherparse::TcpHeader;
 use ipnet::{IpNet, Ipv4Net};
 use log::error;
 use lru_time_cache::LruCache;
-use tokio::sync::Mutex;
+use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
+
+use crate::net::ProxyTcpListener;
 
 pub struct Nat {
     // fake ip to real_src_ip
@@ -25,6 +27,7 @@ impl Nat {
 pub struct TcpTun {
     free_address: Vec<IpAddr>,
     nat: Arc<Mutex<Nat>>,
+    listener_addr: SocketAddr,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -40,13 +43,21 @@ struct TcpConnection {
     state: State
 }
 impl TcpTun{
-    pub fn new(tun_network: IpNet) -> io::Result<TcpTun>{
-        let hosts = tun_network.hosts();
+    pub async fn new(tun_network: IpNet) -> io::Result<TcpTun>{
+        let mut hosts = tun_network.hosts();
+        let listener_addr = match hosts.next(){
+            Some(addr) => addr,
+            None => return Err(io::Error::new(io::ErrorKind::Other, "unexpected listener address allocate failed"))
+        };
+        let listener = ProxyTcpListener::new(listener_addr, 0).await?;
+        let local_addr = listener.local_addr()?;
         let free_src_address = hosts.take(10).collect::<Vec<IpAddr>>();
-        let nat = Nat::new();
+        let nat = Arc::new(Mutex::new(Nat::new()));
+        tokio::spawn(TcpTun::tunnel(listener, nat.clone()));
         Ok(TcpTun {
             free_address: free_src_address,
-            nat: Arc::new(Mutex::new(nat))
+            nat: nat,
+            listener_addr: local_addr,
         })
     }
     pub async fn handle_packet(&self, src_addr: SocketAddr, dest_addr: SocketAddr, tcp_header: &TcpHeader)-> io::Result<Option<(SocketAddr, SocketAddr)>> {
@@ -98,11 +109,14 @@ impl TcpTun{
                 }
             }
         };
-        
+        //          nat (fake_ip, listener ip)              SO_BINDTOINTERFACE
+        // local ---------------------------------> tun -------------------------> server ---------------------> real remote
+        //       <---------------------------------     <-------------------------        <---------------------
+        //        (src_ip, dest_ip) nat                    (fake_ip, server ip)
         let (final_src_ip, final_dest_ip) = if is_reply {
             (dest_addr, src_addr)
         }else {
-            (connection.fake_addr, dest_addr)
+            (connection.fake_addr, self.listener_addr)
         };
         // clean up old connections
         if tcp_header.rst || (tcp_header.ack && connection.state == State::LastAck) {
@@ -119,5 +133,31 @@ impl TcpTun{
             }
         }
         Ok(Some((final_src_ip, final_dest_ip)))
+    }
+    async fn tunnel(listener: ProxyTcpListener, translator: Arc<Mutex<Nat>>) {
+        loop {
+            let (mut stream, remote_addr) = match listener.accept().await {
+                Ok(x )=> x,
+                Err(err) => {
+                    error!("accept error at {}", &err);
+                    continue;
+                }
+            };
+            match translator.lock().await.connections.get(&remote_addr) {
+                Some(conn) => {
+                    tokio::spawn(TcpTun::handle_redir(stream, conn.src_addr, conn.dest_addr));
+                },
+                None => {
+                    error!("unknown connection from tunnel {}", remote_addr);
+                    continue;
+                }
+            };
+        }
+    }
+    // REDIRECT
+    // transparent proxy
+    async fn handle_redir(mut stream: TcpStream, src_addr: SocketAddr, dest_addr: SocketAddr) {
+        // stream is local
+        // 
     }
 }
