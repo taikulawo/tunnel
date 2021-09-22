@@ -125,6 +125,7 @@ impl TcpTun{
             connections.remove(&fake_ip);
         }else if tcp_header.fin {
             // fin, close connection
+            // https://users.cs.northwestern.edu/~agupta/cs340/project2/TCPIP_State_Transition_Diagram.pdf
             match connection.state {
                 // tcp connection state machine
                 State::Established => connection.state = State::FinWait,
