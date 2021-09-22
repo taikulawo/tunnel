@@ -137,6 +137,7 @@ impl TcpTun{
     }
     async fn tunnel(listener: ProxyTcpListener, translator: Arc<Mutex<Nat>>) {
         loop {
+            // remote_addr is fake ip
             let (mut stream, remote_addr) = match listener.accept().await {
                 Ok(x )=> x,
                 Err(err) => {
@@ -144,21 +145,23 @@ impl TcpTun{
                     continue;
                 }
             };
-            match translator.lock().await.connections.get(&remote_addr) {
-                Some(conn) => {
-                    tokio::spawn(TcpTun::handle_redir(stream, conn.src_addr, conn.dest_addr));
-                },
-                None => {
-                    error!("unknown connection from tunnel {}", remote_addr);
-                    continue;
+            let (src_addr, dest_addr) = {
+                let nat = &mut *translator.lock().await;
+                match nat.connections.get(&remote_addr) {
+                    Some(conn) => (conn.src_addr, conn.dest_addr),
+                    None => {
+                        error!("unknown connection from {}", remote_addr);
+                        continue;
+                    }
                 }
             };
+            tokio::spawn(TcpTun::handle_redir(stream, src_addr, dest_addr));
         }
     }
     // REDIRECT
     // transparent proxy
     async fn handle_redir(mut stream: TcpStream, src_addr: SocketAddr, dest_addr: SocketAddr) {
-        // stream is local
+        // stream is local stream
         // 
     }
 }
