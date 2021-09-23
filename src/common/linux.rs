@@ -1,6 +1,7 @@
 use std::{
-    io::{self},
+    io::{self, BufRead},
     process::Command,
+    str::FromStr,
 };
 
 pub fn get_default_ipv4_gateway() -> io::Result<String> {
@@ -20,6 +21,20 @@ pub fn get_default_ipv4_gateway() -> io::Result<String> {
         .collect::<Vec<&str>>()[2]
         .to_string();
     Ok(default)
+}
+
+pub fn get_default_interface() -> io::Result<String> {
+    let output = Command::new("ip").arg("route").arg("show").output()?;
+    let out = String::from_utf8_lossy(&*output.stdout).to_string();
+    let line = out
+        .lines()
+        .filter(|s| s.contains("default"))
+        .next()
+        .unwrap()
+        .split_whitespace()
+        .collect::<Vec<&str>>();
+    let a = line.last().unwrap();
+    Ok(String::from(*a))
 }
 
 #[test]

@@ -2,6 +2,8 @@ use std::{io, net::{IpAddr, SocketAddr}, ops::{Deref, DerefMut}};
 
 use tokio::net::TcpListener;
 
+mod stream;
+mod sys;
 pub struct ProxyTcpListener {
     inner: TcpListener,
 }
@@ -27,3 +29,4 @@ impl DerefMut for ProxyTcpListener {
         &mut self.inner
     }
 }
+
