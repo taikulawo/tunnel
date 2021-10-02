@@ -30,3 +30,8 @@ impl DerefMut for ProxyTcpListener {
     }
 }
 
+
+pub use self::{
+    stream::ProxyStream,
+    sys::bind_to_device
+};

@@ -11,7 +11,7 @@ use log::error;
 use lru_time_cache::LruCache;
 use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
 
-use crate::net::ProxyTcpListener;
+use crate::net::{ProxyTcpListener, ProxyStream};
 
 pub struct Nat {
     // fake ip to real_src_ip
@@ -187,5 +187,12 @@ impl TcpTun {
     async fn handle_redir(mut stream: TcpStream, src_addr: SocketAddr, dest_addr: SocketAddr) {
         // stream is local stream
         //
+        let stream = match ProxyStream::connect(dest_addr).await {
+            Ok(s) => s,
+            Err(err) => {
+                error!("connect to {} failed because of {}", dest_addr, err);
+                return;
+            }
+        };
     }
 }
