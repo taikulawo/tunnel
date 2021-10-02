@@ -1,8 +1,6 @@
-use std::default::default;
-
 pub struct AppConfig {
-    prefer_ipv6: bool,
-    use_ipv6: bool,
+    pub prefer_ipv6: bool,
+    pub use_ipv6: bool,
 }
 
 impl Default for AppConfig {

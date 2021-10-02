@@ -1,7 +1,7 @@
-use std::{io, net::{SocketAddr, UdpSocket}, os::unix::prelude::{FromRawFd, IntoRawFd}};
+use std::{io, net::{IpAddr, SocketAddr}, os::unix::prelude::{FromRawFd, IntoRawFd}};
 
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
-use tokio::{io::{AsyncRead, AsyncWrite}, net::{TcpSocket}};
+use tokio::{io::{AsyncRead, AsyncWrite}, net::{TcpSocket, UdpSocket}};
 
 use crate::{common::get_default_interface, net::{ProxyStream, bind_to_device}};
 
@@ -35,15 +35,15 @@ pub enum BoundedSocket {
     Udp(UdpSocket),
     Tcp(TcpSocket)
 }
-pub fn create_bounded_udp_socket(addr: SocketAddr) -> io::Result<UdpSocket>{
+pub fn create_bounded_udp_socket(addr: IpAddr) -> io::Result<UdpSocket>{
     let socket = match addr {
-        SocketAddr::V4(v4) => Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?,
-        SocketAddr::V6(v6) => Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?
+        IpAddr::V4(..) => Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?,
+        IpAddr::V6(..) => Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?
     };
     // let s: SockAddr = ;
-    socket.bind(&addr.into());
+    socket.bind(&SockAddr::from(SocketAddr::new(addr, 0)));
     socket.set_nonblocking(true);
-    unsafe { Ok(UdpSocket::from_raw_fd(socket.into_raw_fd())) }
+    Ok(UdpSocket::from_std(socket.into())?)
 }
 
 pub fn create_bounded_tcp_socket(addr: SocketAddr) -> io::Result<TcpSocket> {
@@ -53,5 +53,5 @@ pub fn create_bounded_tcp_socket(addr: SocketAddr) -> io::Result<TcpSocket> {
     };
     socket.bind(&addr.into());
     socket.set_nonblocking(true);
-    unsafe { Ok(TcpSocket::from_raw_fd(socket.into_raw_fd())) }
+    Ok(TcpSocket::from_std_stream(socket.into()))
 }
