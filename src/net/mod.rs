@@ -1,4 +1,8 @@
-use std::{io, net::{IpAddr, SocketAddr}, ops::{Deref, DerefMut}};
+use std::{
+    io,
+    net::{IpAddr, SocketAddr},
+    ops::{Deref, DerefMut},
+};
 
 use tokio::net::TcpListener;
 
@@ -11,9 +15,7 @@ pub struct ProxyTcpListener {
 impl ProxyTcpListener {
     pub async fn new(ip_addr: IpAddr, port: u16) -> io::Result<ProxyTcpListener> {
         let listener = TcpListener::bind(SocketAddr::new(ip_addr, port)).await?;
-        Ok(ProxyTcpListener {
-            inner: listener
-        })
+        Ok(ProxyTcpListener { inner: listener })
     }
 }
 
@@ -30,8 +32,4 @@ impl DerefMut for ProxyTcpListener {
     }
 }
 
-
-pub use self::{
-    stream::ProxyStream,
-    sys::bind_to_device
-};
+pub use self::{stream::ProxyStream, sys::bind_to_device};

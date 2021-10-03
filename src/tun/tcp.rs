@@ -11,7 +11,7 @@ use log::error;
 use lru_time_cache::LruCache;
 use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
 
-use crate::net::{ProxyTcpListener, ProxyStream};
+use crate::net::{ProxyStream, ProxyTcpListener};
 
 pub struct Nat {
     // fake ip to real_src_ip

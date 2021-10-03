@@ -1,9 +1,11 @@
-use std::{io::{self, BufRead, ErrorKind}, net::IpAddr, process::Command, str::FromStr};
-use anyhow::{
-    Result,
-    anyhow
-};
+use anyhow::{anyhow, Result};
 use log::error;
+use std::{
+    io::{self, BufRead, ErrorKind},
+    net::IpAddr,
+    process::Command,
+    str::FromStr,
+};
 
 pub fn get_default_ipv4_gateway() -> Result<IpAddr> {
     let output = Command::new("ip")
@@ -35,10 +37,15 @@ pub fn get_default_ipv6_gateway() -> Result<IpAddr> {
         .output()
         .expect("get ipv6 default gateway error");
     if !output.status.success() {
-        return Err(anyhow!("exec failed {}", String::from_utf8_lossy(&*output.stderr)));
+        return Err(anyhow!(
+            "exec failed {}",
+            String::from_utf8_lossy(&*output.stderr)
+        ));
     }
     let line = String::from_utf8_lossy(&*output.stdout);
-    let line = line.lines().filter(|s| s.contains("default"))
+    let line = line
+        .lines()
+        .filter(|s| s.contains("default"))
         .next()
         .unwrap()
         .split_whitespace()
