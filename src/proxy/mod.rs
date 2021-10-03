@@ -2,6 +2,7 @@ use std::{io, net::{IpAddr, SocketAddr}, os::unix::prelude::{FromRawFd, IntoRawF
 
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use tokio::{io::{AsyncRead, AsyncWrite}, net::{TcpSocket, UdpSocket}};
+use async_trait::async_trait;
 
 use crate::{common::get_default_interface, net::{ProxyStream, bind_to_device}};
 
@@ -13,17 +14,23 @@ pub trait TcpInbound {
 pub trait AnyStreamTrait: AsyncRead + AsyncWrite + Unpin {}
 pub type AnyStream = Box<dyn AnyStreamTrait>;
 
+#[async_trait]
 pub trait TcpOutbound {
-    fn handle(stream: ProxyStream, session: ConnectionSession) -> ProxyStream;
+    async fn handle(stream: ProxyStream, session: ConnectionSession) -> ProxyStream;
 }
 
 pub struct DomainSession {
-    dest: String,
+    name: String,
     port: u16,
 }
-pub enum ConnectionSession{
-    Domain(DomainSession),
-    IP(SocketAddr)
+
+pub enum Address {
+    Domain(String),
+    Ip(IpAddr)
+}
+pub struct ConnectionSession{
+    host: Address,
+    port: u16,
 }
 
 pub enum AddressFamily {

@@ -1,25 +1,24 @@
 use std::net::SocketAddr;
 
 use tokio::io::AsyncWriteExt;
+use async_trait::async_trait;
 
-use crate::{
-    net::ProxyStream,
-    proxy::{AnyStream, AnyStreamTrait, ConnectionSession, DomainSession, TcpOutbound},
-};
+use crate::{net::ProxyStream, proxy::{Address, AnyStream, AnyStreamTrait, ConnectionSession, DomainSession, TcpOutbound}};
 
 pub struct OutboundHandler {}
 
+#[async_trait]
 impl TcpOutbound for OutboundHandler {
-    fn handle(stream: ProxyStream, session: ConnectionSession) -> ProxyStream {
-        let addr: SocketAddr = match session {
-            ConnectionSession::Domain(..) => {
-                todo!()
+    async fn handle(stream: ProxyStream, session: ConnectionSession) -> ProxyStream {
+        let ConnectionSession { ref host, ref port } = session;
+        match host {
+            Address::Domain(name) => {
+
+            },
+            Address::Ip(ip) => {
+                
             }
-            ConnectionSession::IP(..) => {
-                todo!()
-            }
-        };
-        ProxyStream::connect(addr);
+        }
         todo!()
     }
 }
