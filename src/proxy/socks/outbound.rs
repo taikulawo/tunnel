@@ -10,7 +10,7 @@ use crate::{
 pub struct OutboundHandler {}
 
 impl TcpOutbound for OutboundHandler {
-    fn handle(session: ConnectionSession) -> ProxyStream {
+    fn handle(stream: ProxyStream, session: ConnectionSession) -> ProxyStream {
         let addr: SocketAddr = match session {
             ConnectionSession::Domain(..) => {
                 todo!()
@@ -24,11 +24,3 @@ impl TcpOutbound for OutboundHandler {
     }
 }
 
-// as client
-async fn handshake<T>(stream: &mut T)
-where
-    T: AnyStreamTrait,
-{
-    stream.write_all(&[0x05, 0x01, 0x00]).await;
-    todo!()
-}

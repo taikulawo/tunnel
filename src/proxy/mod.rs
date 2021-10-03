@@ -14,7 +14,7 @@ pub trait AnyStreamTrait: AsyncRead + AsyncWrite + Unpin {}
 pub type AnyStream = Box<dyn AnyStreamTrait>;
 
 pub trait TcpOutbound {
-    fn handle(session: ConnectionSession) -> ProxyStream;
+    fn handle(stream: ProxyStream, session: ConnectionSession) -> ProxyStream;
 }
 
 pub struct DomainSession {
