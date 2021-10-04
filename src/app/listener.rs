@@ -27,7 +27,7 @@ impl InboundListener {
         };
         Ok(task)
     }
-    async fn tcp_listener(&self, addr: SocketAddr) -> Result<()> {
+    async fn tcp_listener(self, addr: SocketAddr) -> Result<()> {
         let listener = TcpListener::bind(addr).await?;
         let dispatcher = Arc::clone(&self.ctx.dispatcher);
         tokio::spawn(async move {
@@ -37,7 +37,7 @@ impl InboundListener {
         });
         Ok(())
     }
-    async fn udp_listener(&self, addr: SocketAddr) -> Result<()> {
+    async fn udp_listener(self, addr: SocketAddr) -> Result<()> {
         let listener = UdpSocket::bind(addr).await?;
         // todo!("udp listener")
         Ok(())
