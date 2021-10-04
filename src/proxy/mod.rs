@@ -37,7 +37,6 @@ pub trait Inbound {
         stream: CommonStream,
         network: TransportNetwork,
     ) -> Result<ConnectionSession>;
-    fn network() -> Vec<TransportNetwork>;
 }
 
 #[async_trait]
