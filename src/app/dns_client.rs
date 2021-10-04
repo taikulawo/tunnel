@@ -11,6 +11,7 @@ use std::{
     net::{IpAddr, SocketAddr},
     process::Output,
     str::FromStr,
+    sync::Arc,
     vec,
 };
 use tokio::net::UdpSocket;
@@ -21,6 +22,7 @@ use trust_dns_proto::{
 };
 
 use crate::{
+    app::TunnelContext,
     common::{get_default_interface, get_default_ipv4_gateway, get_default_ipv6_gateway},
     config::AppConfig,
     proxy::create_bounded_udp_socket,
@@ -41,12 +43,10 @@ pub struct DnsClient {
 }
 
 impl DnsClient {
-    pub fn new(ips: Vec<IpAddr>) -> DnsClient {
+    pub fn new(config: AppConfig) -> DnsClient {
+        let dns = config.dns;
         DnsClient {
-            remote_dns_servers: ips
-                .iter()
-                .map(|x| SocketAddr::new(x.clone(), 53))
-                .collect::<Vec<SocketAddr>>(),
+            remote_dns_servers: dns.iter().map(|f|f.ip).collect::<Vec<SocketAddr>>(),
             config: Default::default(),
         }
     }
@@ -70,6 +70,7 @@ impl DnsClient {
         let AppConfig {
             prefer_ipv6,
             use_ipv6,
+            ..
         } = self.config;
         let mut tasks: Vec<BoxFuture<Result<Vec<IpAddr>>>> = Vec::new();
         match (use_ipv6, prefer_ipv6) {

@@ -1,5 +1,6 @@
 use std::{io, net::{IpAddr, SocketAddr}, os::unix::prelude::{FromRawFd, IntoRawFd}};
 
+use anyhow::Result;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use tokio::{io::{AsyncRead, AsyncWrite}, net::{TcpSocket, UdpSocket}};
 use async_trait::async_trait;
@@ -7,17 +8,29 @@ use async_trait::async_trait;
 use crate::{common::get_default_interface, net::{ProxyStream, bind_to_device}};
 
 mod socks;
+pub trait CommonStreamTrait: AsyncRead + AsyncWrite + Unpin + Send + Sync{}
+pub type CommonStream = Box<dyn CommonStreamTrait>;
 
-pub trait TcpInbound {
-    fn handle(stream: ProxyStream) -> ConnectionSession;
+
+pub enum NetworkType {
+    TCP,
+    UDP,
 }
-pub trait AnyStreamTrait: AsyncRead + AsyncWrite + Unpin {}
-pub type AnyStream = Box<dyn AnyStreamTrait>;
+
+pub struct TransportNetwork {
+    pub addr: SocketAddr,
+    pub net_type: NetworkType
+}
+#[async_trait]
+pub trait Inbound {
+    async fn handle(&self, stream: CommonStream, network: TransportNetwork) -> Result<ConnectionSession>;
+}
 
 #[async_trait]
-pub trait TcpOutbound {
-    async fn handle(stream: ProxyStream, session: ConnectionSession) -> ProxyStream;
+pub trait Outbound {
+    async fn handle(&self, stream: CommonStream, session: ConnectionSession) -> Result<CommonStream>;
 }
+
 
 pub struct DomainSession {
     name: String,
@@ -33,15 +46,6 @@ pub struct ConnectionSession{
     port: u16,
 }
 
-pub enum AddressFamily {
-    TCP,
-    UDP,
-}
-
-pub enum BoundedSocket {
-    Udp(UdpSocket),
-    Tcp(TcpSocket)
-}
 pub fn create_bounded_udp_socket(addr: IpAddr) -> io::Result<UdpSocket>{
     let socket = match addr {
         IpAddr::V4(..) => Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?,
