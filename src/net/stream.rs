@@ -10,11 +10,11 @@ use tokio::{
 };
 
 use crate::common::get_default_interface;
-use crate::proxy::{CommonStream, create_bounded_tcp_socket};
+use crate::proxy::{create_bounded_tcp_socket, CommonStream};
 
 use super::sys::bind_to_device;
 #[pin_project]
-pub struct ProxyStream{
+pub struct ProxyStream {
     #[pin]
     inner: TcpStream,
 }

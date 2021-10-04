@@ -22,9 +22,9 @@ use trust_dns_proto::{
 };
 
 use crate::{
-    app::TunnelContext,
+    app::Context,
     common::{get_default_interface, get_default_ipv4_gateway, get_default_ipv6_gateway},
-    config::AppConfig,
+    config::{AppConfig, GeneralSettings},
     proxy::create_bounded_udp_socket,
 };
 
@@ -44,9 +44,9 @@ pub struct DnsClient {
 
 impl DnsClient {
     pub fn new(config: AppConfig) -> DnsClient {
-        let dns = config.dns;
+        let dns = config.general.dns;
         DnsClient {
-            remote_dns_servers: dns.iter().map(|f|f.ip).collect::<Vec<SocketAddr>>(),
+            remote_dns_servers: dns.iter().map(|f| f.ip).collect::<Vec<SocketAddr>>(),
             config: Default::default(),
         }
     }
@@ -67,11 +67,11 @@ impl DnsClient {
 
     /// domain string to ip
     pub async fn lookup(&self, host: String) -> Result<Vec<IpAddr>> {
-        let AppConfig {
+        let GeneralSettings {
             prefer_ipv6,
             use_ipv6,
             ..
-        } = self.config;
+        } = self.config.general;
         let mut tasks: Vec<BoxFuture<Result<Vec<IpAddr>>>> = Vec::new();
         match (use_ipv6, prefer_ipv6) {
             (true, true) => {

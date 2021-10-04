@@ -1,16 +1,25 @@
-use std::{io, net::{IpAddr, SocketAddr}, os::unix::prelude::{FromRawFd, IntoRawFd}};
+use std::{
+    io,
+    net::{IpAddr, SocketAddr},
+    os::unix::prelude::{FromRawFd, IntoRawFd},
+};
 
 use anyhow::Result;
-use socket2::{Domain, Protocol, SockAddr, Socket, Type};
-use tokio::{io::{AsyncRead, AsyncWrite}, net::{TcpSocket, UdpSocket}};
 use async_trait::async_trait;
+use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::{TcpSocket, UdpSocket},
+};
 
-use crate::{common::get_default_interface, net::{ProxyStream, bind_to_device}};
+use crate::{
+    common::get_default_interface,
+    net::{bind_to_device, ProxyStream},
+};
 
 mod socks;
-pub trait CommonStreamTrait: AsyncRead + AsyncWrite + Unpin + Send + Sync{}
+pub trait CommonStreamTrait: AsyncRead + AsyncWrite + Unpin + Send + Sync {}
 pub type CommonStream = Box<dyn CommonStreamTrait>;
-
 
 pub enum NetworkType {
     TCP,
@@ -19,18 +28,26 @@ pub enum NetworkType {
 
 pub struct TransportNetwork {
     pub addr: SocketAddr,
-    pub net_type: NetworkType
+    pub net_type: NetworkType,
 }
 #[async_trait]
 pub trait Inbound {
-    async fn handle(&self, stream: CommonStream, network: TransportNetwork) -> Result<ConnectionSession>;
+    async fn handle(
+        &self,
+        stream: CommonStream,
+        network: TransportNetwork,
+    ) -> Result<ConnectionSession>;
+    fn network() -> Vec<TransportNetwork>;
 }
 
 #[async_trait]
 pub trait Outbound {
-    async fn handle(&self, stream: CommonStream, session: ConnectionSession) -> Result<CommonStream>;
+    async fn handle(
+        &self,
+        stream: CommonStream,
+        session: ConnectionSession,
+    ) -> Result<CommonStream>;
 }
-
 
 pub struct DomainSession {
     name: String,
@@ -39,17 +56,17 @@ pub struct DomainSession {
 
 pub enum Address {
     Domain(String),
-    Ip(IpAddr)
+    Ip(IpAddr),
 }
-pub struct ConnectionSession{
+pub struct ConnectionSession {
     host: Address,
     port: u16,
 }
 
-pub fn create_bounded_udp_socket(addr: IpAddr) -> io::Result<UdpSocket>{
+pub fn create_bounded_udp_socket(addr: IpAddr) -> io::Result<UdpSocket> {
     let socket = match addr {
         IpAddr::V4(..) => Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?,
-        IpAddr::V6(..) => Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?
+        IpAddr::V6(..) => Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?,
     };
     // let s: SockAddr = ;
     socket.bind(&SockAddr::from(SocketAddr::new(addr, 0)));
