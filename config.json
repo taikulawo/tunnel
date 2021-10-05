@@ -1,4 +1,8 @@
 {
+    "general":{
+        "prefer_ipv6": false,
+        "use_ipv6": false
+    },
     "api": {
         "address": "127.0.0.1",
         "port": 9991
@@ -47,7 +51,8 @@
             "port": 10086,
             "settings": {
                 "password": "123456"
-            }
+            },
+            "tag":"torjan_in"
         }
     ],
     "outbounds": [
@@ -66,41 +71,38 @@
             "tag": "direct_out"
         }
     ],
-    "router": {
-        "domainResolve": true,
-        "rules": [
-            {
-                "ip": [
-                    "8.8.8.8",
-                    "8.8.4.4"
-                ],
-                "target": "socks_out"
-            },
-            {
-                "portRange": [
-                    "22-22",
-                    "1024-65535"
-                ],
-                "target": "direct_out"
-            },
-            {
-                "domain": [
-                    "www.google.com"
-                ],
-                "target": "socks_out"
-            },
-            {
-                "domainSuffix": [
-                    "google.com"
-                ],
-                "target": "socks_out"
-            },
-            {
-                "domainKeyword": [
-                    "google"
-                ],
-                "target": "socks_out"
-            }
-        ]
-    }
+    "routes": [
+        {
+            "ip": [
+                "8.8.8.8",
+                "8.8.4.4"
+            ],
+            "target": "socks_out"
+        },
+        {
+            "portRange": [
+                "22-22",
+                "1024-65535"
+            ],
+            "target": "direct_out"
+        },
+        {
+            "domain": [
+                "www.google.com"
+            ],
+            "target": "socks_out"
+        },
+        {
+            "domainSuffix": [
+                "google.com"
+            ],
+            "target": "socks_out"
+        },
+        {
+            "domainKeyword": [
+                "google"
+            ],
+            "target": "socks_out"
+        }
+    ]
 }

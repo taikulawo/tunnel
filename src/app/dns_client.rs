@@ -24,7 +24,7 @@ use trust_dns_proto::{
 use crate::{
     app::Context,
     common::{get_default_interface, get_default_ipv4_gateway, get_default_ipv6_gateway},
-    config::{AppConfig, GeneralSettings},
+    config::{Config, GeneralSettings},
     proxy::create_bounded_udp_socket,
 };
 
@@ -39,14 +39,14 @@ macro_rules! random_get {
 pub struct DnsClient {
     /// should be ipv4 addr
     pub remote_dns_servers: Vec<SocketAddr>,
-    pub config: AppConfig,
+    pub config: Config,
 }
 
 impl DnsClient {
-    pub fn new(config: AppConfig) -> DnsClient {
-        let dns = config.general.dns;
+    pub fn new(config: Config) -> DnsClient {
+        let dns = config.dns;
         DnsClient {
-            remote_dns_servers: dns.iter().map(|f| f.ip).collect::<Vec<SocketAddr>>(),
+            remote_dns_servers: Vec::new(),
             config: Default::default(),
         }
     }

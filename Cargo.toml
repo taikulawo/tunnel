@@ -11,8 +11,8 @@ path = "bin/tunnel.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.11.0", features = ["full"]}
-tun = { version = "0.5.3", features = ["async"]}
+tokio = { version = "1.11.0", features = ["full"] }
+tun = { version = "0.5.3", features = ["async"] }
 ipnet = { version = "2.3.1" }
 etherparse = "0.9.0"
 log4rs = "1.0.0"
@@ -26,3 +26,7 @@ socket2 = "0.4.2"
 futures-util = "0.3.17"
 anyhow = "1.0.44"
 async-trait = "0.1.51"
+serde_json = { version = "1.0.68", features = ["raw_value"] }
+serde_derive = "1.0.130"
+serde = { version = "1.0" }
+clap="2.33.3"
