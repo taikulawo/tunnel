@@ -17,9 +17,9 @@ use crate::{
     net::{bind_to_device, ProxyStream},
 };
 
-mod socks;
-pub trait CommonStreamTrait: AsyncRead + AsyncWrite + Unpin + Send + Sync {}
-pub type CommonStream = Box<dyn CommonStreamTrait>;
+pub mod socks;
+pub trait GeneralConnTrait: AsyncRead + AsyncWrite + Unpin + Send + Sync {}
+pub type GeneralConn = Box<dyn GeneralConnTrait>;
 
 pub enum NetworkType {
     TCP,
@@ -34,18 +34,19 @@ pub struct TransportNetwork {
 pub trait Inbound {
     async fn handle(
         &self,
-        stream: CommonStream,
-        network: TransportNetwork,
-    ) -> Result<ConnectionSession>;
+        conn: GeneralConn,
+        network: NetworkType,
+    ) -> Result<ConnSession>;
+    fn network() -> Vec<NetworkType>;
 }
 
 #[async_trait]
 pub trait Outbound {
     async fn handle(
         &self,
-        stream: CommonStream,
-        session: ConnectionSession,
-    ) -> Result<CommonStream>;
+        conn: GeneralConn,
+        session: ConnSession,
+    ) -> Result<GeneralConn>;
 }
 
 pub struct DomainSession {
@@ -57,7 +58,8 @@ pub enum Address {
     Domain(String),
     Ip(IpAddr),
 }
-pub struct ConnectionSession {
+// connection session
+pub struct ConnSession {
     host: Address,
     port: u16,
 }

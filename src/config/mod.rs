@@ -23,6 +23,8 @@ pub struct GeneralSettings {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SocksInboundSettings {
     pub address: String,
+    pub method: String,
+    pub port: u16,
 }
 #[derive(Clone, Deserialize)]
 pub struct Inbound {

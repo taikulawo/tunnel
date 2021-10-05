@@ -10,7 +10,7 @@ use tokio::{
 };
 
 use crate::common::get_default_interface;
-use crate::proxy::{create_bounded_tcp_socket, CommonStream};
+use crate::proxy::{create_bounded_tcp_socket, GeneralConn};
 
 use super::sys::bind_to_device;
 #[pin_project]

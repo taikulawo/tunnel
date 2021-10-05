@@ -10,14 +10,15 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use trust_dns_proto::rr::rdata::name;
 
 use crate::proxy::{
-    Address, CommonStream, CommonStreamTrait, ConnectionSession, DomainSession, Inbound,
+    Address, GeneralConn, GeneralConnTrait, ConnSession, DomainSession, Inbound,
     ProxyStream,
 };
 
 mod inbound;
 mod outbound;
 
-pub struct Socks {}
+pub use self::inbound::SocksInbound;
+pub use self::outbound::OutboundHandler;
 const NO_AUTHENTICATION_REQUIRED: u8 = 0x01;
 const CMD_CONNECT: u8 = 0x01;
 const CMD_BIND: u8 = 0x02;
@@ -26,9 +27,9 @@ const TYPE_IPV4: u8 = 0x01;
 const TYPE_DOMAIN: u8 = 0x03;
 const TYPE_IPV6: u8 = 0x04;
 // as client
-async fn handshake_as_client<T>(stream: &mut T, session: &ConnectionSession) -> Result<()>
+async fn handshake_as_client<T>(stream: &mut T, session: &ConnSession) -> Result<()>
 where
-    T: CommonStreamTrait,
+    T: GeneralConnTrait,
 {
     stream.write_all(&[0x05, 0x01, 0x00]).await?;
     let mut buf = vec![0u8; 2];
@@ -47,7 +48,7 @@ where
     Ok(())
 }
 
-fn build_request(buf: &mut Vec<u8>, session: &ConnectionSession) {
+fn build_request(buf: &mut Vec<u8>, session: &ConnSession) {
     buf.extend(&[0x05, 0x01, 0x00]);
     buf.extend(&[CMD_CONNECT]); // TODO support more ATYP instead of only CONNECT
     match session.host {
@@ -73,7 +74,7 @@ fn build_request(buf: &mut Vec<u8>, session: &ConnectionSession) {
 }
 
 // as server
-async fn handshake_as_server(stream: &mut CommonStream) -> Result<ConnectionSession> {
+async fn handshake_as_server(stream: &mut GeneralConn) -> Result<ConnSession> {
     let mut buf = vec![0; 3];
     stream.read_exact(&mut buf).await?;
     let version = buf[0];
@@ -118,7 +119,7 @@ async fn handshake_as_server(stream: &mut CommonStream) -> Result<ConnectionSess
     let mut buf = [0u8; 2];
     stream.read_exact(&mut buf).await?;
     let port = unsafe { u16::from_be(*(buf.as_ptr() as *const u16)) };
-    let res = ConnectionSession {
+    let res = ConnSession {
         host: address,
         port,
     };
