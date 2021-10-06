@@ -11,11 +11,19 @@ impl Inbound for SocksInbound {
         conn: GeneralConn,
         network: NetworkType,
     ) -> Result<ConnSession> {
-        let mut stream = conn;
-        let session = handshake_as_server(&mut stream).await?;
-        Ok(session)
+        match network {
+            NetworkType::TCP => {
+                let mut stream = conn;
+                let session = handshake_as_server(&mut stream).await?;
+                Ok(session)
+            },
+            NetworkType::UDP => {
+                todo!()
+            }
+        }
+
     }
     fn network() -> Vec<NetworkType>{
-        vec![NetworkType::TCP]
+        vec![NetworkType::TCP, NetworkType::UDP]
     }
 }
