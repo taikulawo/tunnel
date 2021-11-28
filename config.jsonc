@@ -71,6 +71,7 @@
             "tag": "direct_out"
         }
     ],
+    // route 按照数组顺序，自上而下进行
     "routes": [
         {
             "ip": [

@@ -19,8 +19,9 @@ use crate::{
 
 pub mod socks;
 pub trait GeneralConnTrait: AsyncRead + AsyncWrite + Unpin + Send + Sync {}
+impl<S> GeneralConnTrait for S where S: AsyncRead + AsyncWrite + Unpin + Send + Sync {}
 pub type GeneralConn = Box<dyn GeneralConnTrait>;
-
+pub 
 pub enum NetworkType {
     TCP,
     UDP,
