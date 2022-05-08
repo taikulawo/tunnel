@@ -156,12 +156,12 @@ impl DnsClient {
                         return Ok(ips);
                     }
                     Err(err) => {
-                        todo!()
+                        return Err(anyhow!("error when recv from {}", err))
                     }
                 }
             }
             Err(err) => {
-                todo!()
+                return Err(anyhow!("error when send to {}", err))
             }
         };
     }

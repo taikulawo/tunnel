@@ -13,3 +13,7 @@ rust tun proxy implementation
 ------> tun inbound handler  |                                   |
                                                                  | ----> other protocols ...
 ```
+
+按照约定的 `config.jsonc` 进行开发
+
+有些 inbound protocol 会含有 tcp inbound 和 udp inbound

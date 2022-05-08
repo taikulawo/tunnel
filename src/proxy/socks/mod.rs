@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Result};
 use ipnet::IpAdd;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::{io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt}, net::TcpStream};
 use trust_dns_proto::rr::rdata::name;
 
 use crate::proxy::{
@@ -17,7 +17,8 @@ use crate::proxy::{
 mod inbound;
 mod outbound;
 
-pub use self::inbound::SocksInbound;
+pub use self::inbound::SocksTcpInboundHandler;
+pub use self::inbound::SocksUdpInboundHandler;
 pub use self::outbound::OutboundHandler;
 const NO_AUTHENTICATION_REQUIRED: u8 = 0x01;
 const CMD_CONNECT: u8 = 0x01;
@@ -74,7 +75,7 @@ fn build_request(buf: &mut Vec<u8>, session: &ConnSession) {
 }
 
 // as server
-async fn handshake_as_server(stream: &mut GeneralConn) -> Result<ConnSession> {
+async fn handshake_as_server(stream: &mut TcpStream) -> Result<ConnSession> {
     let mut buf = vec![0; 3];
     stream.read_exact(&mut buf).await?;
     let version = buf[0];
