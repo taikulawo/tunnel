@@ -12,16 +12,6 @@ use tokio::{
     net::{TcpSocket, UdpSocket, TcpStream},
 };
 
-use crate::{
-    common::get_default_interface,
-    net::{bind_to_device, ProxyStream},
-};
-
-pub mod socks;
-pub trait GeneralConnTrait: AsyncRead + AsyncWrite + Unpin + Send + Sync {}
-impl<S> GeneralConnTrait for S where S: AsyncRead + AsyncWrite + Unpin + Send + Sync {}
-pub type GeneralConn = Box<dyn GeneralConnTrait>;
-// pub 
 pub enum NetworkType {
     TCP,
     UDP,
@@ -31,24 +21,11 @@ pub struct TransportNetwork {
     pub addr: SocketAddr,
     pub net_type: NetworkType,
 }
-#[async_trait]
-pub trait Inbound {
-    async fn handle(
-        &self,
-        conn: GeneralConn,
-        network: NetworkType,
-    ) -> Result<ConnSession>;
-    fn network() -> Vec<NetworkType>;
-}
+pub mod socks;
 
-#[async_trait]
-pub trait Outbound {
-    async fn handle(
-        &self,
-        conn: GeneralConn,
-        session: ConnSession,
-    ) -> Result<GeneralConn>;
-}
+pub trait RWSocketTrait: AsyncRead + AsyncWrite + Unpin + Sync + Send {}
+
+pub type RWSocket = Box<dyn RWSocketTrait>;
 
 pub struct DomainSession {
     name: String,
@@ -99,7 +76,7 @@ pub fn create_bounded_tcp_socket(addr: SocketAddr) -> io::Result<TcpSocket> {
 
 
 // ----------------------------
-
+// INBOUND
 pub enum InboundResult {
     Stream(TcpStream, ConnSession),
     Datagram(UdpSocket, ConnSession),
@@ -138,4 +115,32 @@ pub trait TcpInboundHandlerTrait {
 #[async_trait]
 pub trait UdpInboundHandlerTrait {
     async fn handle(&self, session: ConnSession, socket: tokio::net::UdpSocket) -> io::Result<InboundResult>;
+}
+
+
+// OUTBOUND
+
+
+pub enum OutboundResult {
+    Stream(TcpStream),
+    Datagram(UdpSocket),
+}
+
+#[async_trait]
+pub trait TcpOutboundHandlerTrait {
+    async fn handle(&self, sess: ConnSession) -> io::Result<OutboundResult>;
+}
+
+#[async_trait]
+pub trait UdpOutboundHandlerTrait {
+    async fn handle(&self, sess: ConnSession) -> io::Result<OutboundResult>;
+}
+
+pub type AnyTcpOutboundHandler = Arc<dyn TcpOutboundHandlerTrait>;
+pub type AnyUdpOutboundHandler = Arc<dyn UdpOutboundHandlerTrait>;
+
+pub struct OutboundHandler {
+    tag: String,
+    tcp_handler: Option<AnyTcpOutboundHandler>,
+    udp_handler: Option<AnyUdpOutboundHandler>,
 }

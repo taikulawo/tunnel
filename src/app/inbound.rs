@@ -5,7 +5,7 @@ use log::{
 };
 use anyhow::Result;
 
-use crate::{Config, config::{SocksInboundSettings, Inbound}, proxy::{socks::{SocksTcpInboundHandler, SocksUdpInboundHandler}, InboundHandlerTrait, InboundHandler, AnyInboundHandler}};
+use crate::{Config, config::{Socks5InboundSettings, Inbound}, proxy::{socks::{SocksTcpInboundHandler, SocksUdpInboundHandler}, InboundHandlerTrait, InboundHandler, AnyInboundHandler}};
 
 pub async fn inboundInit(config: Arc<Config>) -> Result<()> {
     let mut inbounds = &config.inbounds;
@@ -14,7 +14,7 @@ pub async fn inboundInit(config: Arc<Config>) -> Result<()> {
         match &*inbound.protocol {
             "socks" => {
                 if let Some(ref settings) = inbound.settings {
-                    let socks_settings: SocksInboundSettings = serde_json::from_str(settings.get())?;
+                    let socks_settings: Socks5InboundSettings = serde_json::from_str(settings.get())?;
                     let handler = SocksTcpInboundHandler{};
                     handlers.insert(inbound.tag.clone(), handler);
                 }
@@ -54,5 +54,8 @@ impl InboundManager {
         InboundManager {
 
         }
+    }
+    pub async fn listen() {
+
     }
 }

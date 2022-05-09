@@ -1,40 +1,62 @@
-use std::{collections::HashMap, fs::{self, File}, io::BufReader, net::SocketAddr, path::Path};
 use anyhow::Result;
-use serde_json::{Map, value::RawValue};
-use serde_derive::{
-    Serialize,
-    Deserialize,
+use serde_derive::{Deserialize, Serialize};
+use serde_json::value::RawValue;
+use std::{
+    collections::HashMap,
+    fs::{self, File},
+    net::SocketAddr,
 };
-#[derive(Clone,Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct Outbound {
-    protocol: String,
-
-    // shadowsocks | socks5
-    password: Option<String>,
-    method: Option<String>,
+    // socks5, shadowsocks, vmess
+    pub protocol: String,
+    pub bind: String,
+    pub settings: Option<Box<RawValue>>,
+    pub tag: String,
 }
 
-#[derive(Clone,Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct GeneralSettings {
     pub prefer_ipv6: bool,
     pub use_ipv6: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct SocksInboundSettings {
+pub struct Socks5InboundSettings {
     pub address: String,
-    pub method: String,
     pub port: u16,
+    pub method: String,
 }
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Socks5OutboundSettings {
+    pub address: String,
+    pub port: u16,
+    pub method: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ShadowsocksInboundSettings {
+    pub method: String,
+    pub password: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ShadowsocksOutboundSettings {
+    pub address: String,
+    pub port: u16,
+    pub password: String,
+}
+
 #[derive(Clone, Deserialize)]
 pub struct Inbound {
     pub protocol: String,
     pub tag: String,
     // domain or socket addr
-    pub settings: Option<Box<RawValue>>
+    pub settings: Option<Box<RawValue>>,
 }
 
-#[derive(Clone,Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct Rule {
     ip: Option<Vec<String>>,
     portRange: Option<Vec<String>>,
@@ -75,7 +97,7 @@ impl Default for Config {
     }
 }
 
-pub fn parse_from_str(p: &str) -> Result<Config>{
+pub fn parse_from_str(p: &str) -> Result<Config> {
     let json = serde_json::from_str(p)?;
     Ok(json)
 }

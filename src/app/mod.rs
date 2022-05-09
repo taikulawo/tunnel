@@ -9,6 +9,7 @@ mod dispatcher;
 mod dns_client;
 mod listener;
 mod inbound;
+mod outbound;
 pub struct Context {
     resolver: DnsClient,
     config: Config,

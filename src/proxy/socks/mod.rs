@@ -6,12 +6,14 @@ use std::{
 
 use anyhow::{anyhow, bail, Result};
 use ipnet::IpAdd;
-use tokio::{io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt}, net::TcpStream};
+use tokio::{
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    net::TcpStream,
+};
 use trust_dns_proto::rr::rdata::name;
 
 use crate::proxy::{
-    Address, GeneralConn, GeneralConnTrait, ConnSession, DomainSession, Inbound,
-    ProxyStream,
+    Address, ConnSession,
 };
 
 mod inbound;
@@ -19,7 +21,8 @@ mod outbound;
 
 pub use self::inbound::SocksTcpInboundHandler;
 pub use self::inbound::SocksUdpInboundHandler;
-pub use self::outbound::OutboundHandler;
+pub use self::outbound::TcpOutboundHandler;
+use super::RWSocketTrait;
 const NO_AUTHENTICATION_REQUIRED: u8 = 0x01;
 const CMD_CONNECT: u8 = 0x01;
 const CMD_BIND: u8 = 0x02;
@@ -30,7 +33,7 @@ const TYPE_IPV6: u8 = 0x04;
 // as client
 async fn handshake_as_client<T>(stream: &mut T, session: &ConnSession) -> Result<()>
 where
-    T: GeneralConnTrait,
+    T: RWSocketTrait,
 {
     stream.write_all(&[0x05, 0x01, 0x00]).await?;
     let mut buf = vec![0u8; 2];

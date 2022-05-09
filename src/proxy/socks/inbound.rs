@@ -1,9 +1,14 @@
+use log::error;
 use std::io;
-use log:: {
-    error
-};
 
-use crate::{config::SocksInboundSettings, net::ProxyStream, proxy::{GeneralConn, ConnSession, Inbound, NetworkType, TransportNetwork, socks::handshake_as_server, TcpInboundHandlerTrait, InboundResult, UdpInboundHandlerTrait}};
+use crate::{
+    config::Socks5InboundSettings,
+    net::ProxyStream,
+    proxy::{
+        socks::handshake_as_server, ConnSession, InboundResult, TcpInboundHandlerTrait,
+        UdpInboundHandlerTrait,
+    },
+};
 use async_trait::async_trait;
 use tokio::net::{TcpStream, UdpSocket};
 
@@ -11,24 +16,17 @@ pub struct SocksTcpInboundHandler;
 
 #[async_trait]
 impl TcpInboundHandlerTrait for SocksTcpInboundHandler {
-    async fn handle(
-        &self,
-        conn: ConnSession,
-        mut stream: TcpStream,
-    ) -> io::Result<InboundResult> {
+    async fn handle(&self, conn: ConnSession, mut stream: TcpStream) -> io::Result<InboundResult> {
         let session = match handshake_as_server(&mut stream).await {
             Ok(session) => session,
             Err(err) => {
                 error!("failed to process socks inbound {}", err);
-                return Err(io::Error::new(io::ErrorKind::Other, "unknown"))
+                return Err(io::Error::new(io::ErrorKind::Other, "unknown"));
             }
         };
         Ok(InboundResult::Stream(stream, conn))
     }
 }
-
-
-
 
 pub struct SocksUdpInboundHandler;
 
