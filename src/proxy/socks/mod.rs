@@ -1,5 +1,5 @@
 use std::{
-    net::{IpAddr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     ops::Add,
     str::FromStr,
 };
@@ -12,9 +12,7 @@ use tokio::{
 };
 use trust_dns_proto::rr::rdata::name;
 
-use crate::proxy::{
-    Address, Session,
-};
+use crate::proxy::{Address, Session};
 
 mod inbound;
 mod outbound;
@@ -22,7 +20,7 @@ mod outbound;
 pub use self::inbound::SocksTcpInboundHandler;
 pub use self::inbound::SocksUdpInboundHandler;
 pub use self::outbound::TcpOutboundHandler;
-use super::{RWSocketTrait, Network};
+use super::{Network, RWSocketTrait};
 const NO_AUTHENTICATION_REQUIRED: u8 = 0x01;
 const CMD_CONNECT: u8 = 0x01;
 const CMD_BIND: u8 = 0x02;
@@ -55,13 +53,13 @@ where
 fn build_request(buf: &mut Vec<u8>, session: &Session) {
     buf.extend(&[0x05, 0x01, 0x00]);
     buf.extend(&[CMD_CONNECT]); // TODO support more ATYP instead of only CONNECT
-    match session.peer {
-        Address::Domain(ref name) => {
+    match session.destination {
+        Address::Domain(ref name, _) => {
             buf.push(TYPE_DOMAIN);
             buf.push(name.len() as u8);
             buf.extend_from_slice(name.as_bytes());
         }
-        Address::Ip(ref addr) => match addr{
+        Address::Ip(ref addr) => match addr.ip() {
             IpAddr::V4(ref v4) => {
                 buf.push(TYPE_IPV4);
                 buf.extend(v4.octets());
@@ -70,9 +68,12 @@ fn build_request(buf: &mut Vec<u8>, session: &Session) {
                 buf.push(TYPE_IPV6);
                 buf.extend(v6.octets());
             }
-    },
+        },
     };
-    let port = session.peer_port;
+    let port = match session.destination {
+        Address::Domain(_, port) => port,
+        Address::Ip(addr) => addr.port(),
+    };
     buf.push((port >> 8) as u8);
     buf.push(port as u8);
 }
@@ -96,38 +97,50 @@ async fn handshake_as_server(stream: &mut TcpStream) -> Result<Session> {
             buf.resize(len.into(), 0);
             stream.read_exact(&mut buf).await?;
             let name = String::from_utf8_lossy(&buf);
-            Address::Domain(name.to_string())
+            Address::Domain(name.to_string(), 0)
         }
         TYPE_IPV4 => {
             buf.resize(4, 0);
             stream.read_exact(&mut buf).await?;
             let str = String::from_utf8_lossy(&buf);
-            let ipv4 = match IpAddr::from_str(&str) {
+            let ipv4 = match Ipv4Addr::from_str(&str) {
                 Ok(x) => x,
                 Err(err) => bail!("should be ipv4 {} {:?}", err, &buf),
             };
-            Address::Ip(ipv4)
+            Address::Ip(SocketAddr::new(IpAddr::V4(ipv4), 0))
         }
         TYPE_IPV6 => {
             buf.resize(16, 0);
             stream.read_exact(&mut buf).await?;
             let str = String::from_utf8_lossy(&buf);
-            let ipv6 = match IpAddr::from_str(&str) {
+            let ipv6 = match Ipv6Addr::from_str(&str) {
                 Ok(x) => x,
                 Err(err) => bail!("should be ipv6 {} {:?}", err, &buf),
             };
-            Address::Ip(ipv6)
+            Address::Ip(SocketAddr::new(IpAddr::V6(ipv6), 0))
         }
         _ => bail!("unknown atyp {}", buf[3]),
     };
     let mut buf = [0u8; 2];
     stream.read_exact(&mut buf).await?;
     let port = unsafe { u16::from_be(*(buf.as_ptr() as *const u16)) };
+    let address = match address {
+        Address::Domain(domain, _) => Address::Domain(domain, port),
+        Address::Ip(addr) => match addr {
+            SocketAddr::V4(mut v4) => {
+                v4.set_port(port);
+                Address::Ip(SocketAddr::V4(v4))
+            }
+            SocketAddr::V6(mut v6) => {
+                v6.set_port(port);
+                Address::Ip(SocketAddr::V6(v6))
+            }
+        },
+    };
     let res = Session {
-        peer_port: port,
-        peer: address,
+        destination: address,
         network: Network::TCP,
-        local: stream.local_addr().expect("local"),
+        local_peer: stream.local_addr().expect("local"),
     };
     Ok(res)
 }

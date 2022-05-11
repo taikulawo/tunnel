@@ -1,5 +1,7 @@
 use std::{io::Result, net::SocketAddr, sync::Arc};
-
+use log::{
+    error
+};
 use futures_util::{future::BoxFuture, stream::FuturesUnordered, FutureExt, StreamExt};
 use tokio::{
     net::{TcpListener, UdpSocket},
@@ -9,7 +11,7 @@ use tokio::{
 use crate::{
     app::Context,
     config,
-    proxy::{AnyInboundHandler, NetworkType, TransportNetwork, InboundHandler, TcpInboundHandlerTrait, Session, Address, Network},
+    proxy::{AnyInboundHandler, NetworkType, TransportNetwork, InboundHandler, TcpInboundHandlerTrait, Session, Address, Network, InboundResult},
 };
 
 use super::dispatcher::Dispatcher;
@@ -54,12 +56,21 @@ impl InboundListener {
                 let addr = conn.peer_addr().expect("peer");
                 let local = conn.local_addr().expect("local");
                 let session= Session {
-                    peer: Address::Ip(addr.ip()),
-                    peer_port: addr.port(),
+                    destination: Address::Ip(addr),
                     network: Network::TCP,
-                    local
+                    local_peer: local
                 };
-                TcpInboundHandlerTrait::handle(&*handler, session, conn);
+                match TcpInboundHandlerTrait::handle(&*handler, session, conn).await {
+                    Ok(InboundResult::Stream(stream, sess)) => {
+                        dispatcher.dispatch_tcp(stream, sess).await;
+                    },
+                    Ok(InboundResult::Datagram(socket, sess)) => {
+                        dispatcher.dispatch_udp(socket, sess).await;
+                    },
+                    Err(err) => {
+                        error!("handle tcp inbound failed{}", err);
+                    }
+                }
             }
         });
         Ok(())

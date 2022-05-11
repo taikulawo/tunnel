@@ -34,8 +34,8 @@ pub struct DomainSession {
 }
 
 pub enum Address {
-    Domain(String),
-    Ip(IpAddr)
+    Domain(String, u16),
+    Ip(SocketAddr)
 }
 
 pub enum Network {
@@ -44,10 +44,11 @@ pub enum Network {
 }
 // connection session
 pub struct Session {
-    pub peer: Address,
-    // peer port
-    pub peer_port: u16,
-    pub local: SocketAddr,
+    pub destination: Address,
+    // 连接到本地代理服务器的remote
+    // local_peer <=> tunnel
+    pub local_peer: SocketAddr,
+    
     pub network: Network
 }
 
