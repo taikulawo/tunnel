@@ -5,7 +5,7 @@ use crate::{
     config::Socks5InboundSettings,
     net::ProxyStream,
     proxy::{
-        socks::handshake_as_server, ConnSession, InboundResult, TcpInboundHandlerTrait,
+        socks::handshake_as_server, Session, InboundResult, TcpInboundHandlerTrait,
         UdpInboundHandlerTrait,
     },
 };
@@ -16,7 +16,7 @@ pub struct SocksTcpInboundHandler;
 
 #[async_trait]
 impl TcpInboundHandlerTrait for SocksTcpInboundHandler {
-    async fn handle(&self, conn: ConnSession, mut stream: TcpStream) -> io::Result<InboundResult> {
+    async fn handle(&self, conn: Session, mut stream: TcpStream) -> io::Result<InboundResult> {
         let session = match handshake_as_server(&mut stream).await {
             Ok(session) => session,
             Err(err) => {
@@ -32,7 +32,7 @@ pub struct SocksUdpInboundHandler;
 
 #[async_trait]
 impl UdpInboundHandlerTrait for SocksUdpInboundHandler {
-    async fn handle(&self, conn: ConnSession, socket: UdpSocket) -> io::Result<InboundResult> {
+    async fn handle(&self, conn: Session, socket: UdpSocket) -> io::Result<InboundResult> {
         Ok(InboundResult::Datagram(socket, conn))
     }
 }

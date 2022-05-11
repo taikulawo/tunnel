@@ -5,19 +5,14 @@ use async_trait::async_trait;
 use tokio::io::AsyncWriteExt;
 
 use crate::{
-    proxy::{Address, ConnSession, OutboundResult, TcpOutboundHandlerTrait},
+    proxy::{Address, Session, OutboundResult, TcpOutboundHandlerTrait},
 };
 
 pub struct TcpOutboundHandler {}
 
 #[async_trait]
 impl TcpOutboundHandlerTrait for TcpOutboundHandler {
-    async fn handle(&self, session: ConnSession) -> io::Result<OutboundResult> {
-        let ConnSession { ref host, ref port } = session;
-        match host {
-            Address::Domain(name) => {}
-            Address::Ip(ip) => {}
-        }
+    async fn handle(&self, session: Session) -> io::Result<OutboundResult> {
         todo!()
     }
 }
@@ -26,7 +21,7 @@ pub struct UdpOutboundHandler {}
 
 #[async_trait]
 impl TcpOutboundHandlerTrait for UdpOutboundHandler {
-    async fn handle(&self, session: ConnSession) -> io::Result<OutboundResult> {
+    async fn handle(&self, session: Session) -> io::Result<OutboundResult> {
         todo!()
     }
 }

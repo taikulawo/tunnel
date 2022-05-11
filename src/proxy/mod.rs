@@ -35,12 +35,20 @@ pub struct DomainSession {
 
 pub enum Address {
     Domain(String),
-    Ip(IpAddr),
+    Ip(IpAddr)
+}
+
+pub enum Network {
+    TCP,
+    UDP
 }
 // connection session
-pub struct ConnSession {
-    host: Address,
-    port: u16,
+pub struct Session {
+    pub peer: Address,
+    // peer port
+    pub peer_port: u16,
+    pub local: SocketAddr,
+    pub network: Network
 }
 
 pub fn create_bounded_udp_socket(addr: IpAddr) -> io::Result<UdpSocket> {
@@ -79,8 +87,8 @@ pub fn create_bounded_tcp_socket(addr: SocketAddr) -> io::Result<TcpSocket> {
 // ----------------------------
 // INBOUND
 pub enum InboundResult {
-    Stream(TcpStream, ConnSession),
-    Datagram(UdpSocket, ConnSession),
+    Stream(TcpStream, Session),
+    Datagram(UdpSocket, Session),
 }
 
 pub type AnyTcpInboundHandler = Arc<dyn TcpInboundHandlerTrait>;
@@ -110,12 +118,12 @@ pub trait InboundHandlerTrait: TcpInboundHandlerTrait + UdpInboundHandlerTrait +
 
 #[async_trait]
 pub trait TcpInboundHandlerTrait {
-    async fn handle(&self, session: ConnSession, stream: TcpStream) -> io::Result<InboundResult>;
+    async fn handle(&self, session: Session, stream: TcpStream) -> io::Result<InboundResult>;
 }
 
 #[async_trait]
 pub trait UdpInboundHandlerTrait {
-    async fn handle(&self, session: ConnSession, socket: tokio::net::UdpSocket) -> io::Result<InboundResult>;
+    async fn handle(&self, session: Session, socket: tokio::net::UdpSocket) -> io::Result<InboundResult>;
 }
 
 
@@ -129,12 +137,12 @@ pub enum OutboundResult {
 
 #[async_trait]
 pub trait TcpOutboundHandlerTrait {
-    async fn handle(&self, sess: ConnSession) -> io::Result<OutboundResult>;
+    async fn handle(&self, sess: Session) -> io::Result<OutboundResult>;
 }
 
 #[async_trait]
 pub trait UdpOutboundHandlerTrait {
-    async fn handle(&self, sess: ConnSession) -> io::Result<OutboundResult>;
+    async fn handle(&self, sess: Session) -> io::Result<OutboundResult>;
 }
 
 pub type AnyTcpOutboundHandler = Arc<dyn TcpOutboundHandlerTrait>;

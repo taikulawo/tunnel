@@ -13,7 +13,7 @@ use tokio::{
 use trust_dns_proto::rr::rdata::name;
 
 use crate::proxy::{
-    Address, ConnSession,
+    Address, Session,
 };
 
 mod inbound;
@@ -22,7 +22,7 @@ mod outbound;
 pub use self::inbound::SocksTcpInboundHandler;
 pub use self::inbound::SocksUdpInboundHandler;
 pub use self::outbound::TcpOutboundHandler;
-use super::RWSocketTrait;
+use super::{RWSocketTrait, Network};
 const NO_AUTHENTICATION_REQUIRED: u8 = 0x01;
 const CMD_CONNECT: u8 = 0x01;
 const CMD_BIND: u8 = 0x02;
@@ -31,7 +31,7 @@ const TYPE_IPV4: u8 = 0x01;
 const TYPE_DOMAIN: u8 = 0x03;
 const TYPE_IPV6: u8 = 0x04;
 // as client
-async fn handshake_as_client<T>(stream: &mut T, session: &ConnSession) -> Result<()>
+async fn handshake_as_client<T>(stream: &mut T, session: &Session) -> Result<()>
 where
     T: RWSocketTrait,
 {
@@ -52,16 +52,16 @@ where
     Ok(())
 }
 
-fn build_request(buf: &mut Vec<u8>, session: &ConnSession) {
+fn build_request(buf: &mut Vec<u8>, session: &Session) {
     buf.extend(&[0x05, 0x01, 0x00]);
     buf.extend(&[CMD_CONNECT]); // TODO support more ATYP instead of only CONNECT
-    match session.host {
+    match session.peer {
         Address::Domain(ref name) => {
             buf.push(TYPE_DOMAIN);
             buf.push(name.len() as u8);
             buf.extend_from_slice(name.as_bytes());
         }
-        Address::Ip(ref ip) => match *ip {
+        Address::Ip(ref addr) => match addr{
             IpAddr::V4(ref v4) => {
                 buf.push(TYPE_IPV4);
                 buf.extend(v4.octets());
@@ -70,15 +70,15 @@ fn build_request(buf: &mut Vec<u8>, session: &ConnSession) {
                 buf.push(TYPE_IPV6);
                 buf.extend(v6.octets());
             }
-        },
+    },
     };
-    let port = session.port;
+    let port = session.peer_port;
     buf.push((port >> 8) as u8);
     buf.push(port as u8);
 }
 
 // as server
-async fn handshake_as_server(stream: &mut TcpStream) -> Result<ConnSession> {
+async fn handshake_as_server(stream: &mut TcpStream) -> Result<Session> {
     let mut buf = vec![0; 3];
     stream.read_exact(&mut buf).await?;
     let version = buf[0];
@@ -123,9 +123,11 @@ async fn handshake_as_server(stream: &mut TcpStream) -> Result<ConnSession> {
     let mut buf = [0u8; 2];
     stream.read_exact(&mut buf).await?;
     let port = unsafe { u16::from_be(*(buf.as_ptr() as *const u16)) };
-    let res = ConnSession {
-        host: address,
-        port,
+    let res = Session {
+        peer_port: port,
+        peer: address,
+        network: Network::TCP,
+        local: stream.local_addr().expect("local"),
     };
     Ok(res)
 }
