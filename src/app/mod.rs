@@ -10,6 +10,8 @@ mod dns_client;
 mod listener;
 mod inbound;
 mod outbound;
+mod sniffer;
+
 pub struct Context {
     resolver: DnsClient,
     config: Config,
