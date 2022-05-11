@@ -7,7 +7,6 @@ use log4rs::{
     config::{Appender, Logger, Root},
 };
 use tokio::runtime::Builder;
-use tunnel::Tun;
 fn main() {
     let app = clap::App::new("tunnel").arg(
         Arg::with_name("config")
@@ -41,10 +40,10 @@ fn main() {
             return;
         }
     };
-    rt.block_on(async {
-        let mut tun = Tun::new().await.unwrap();
-        tun.run().await
-    })
-    .unwrap();
+    // rt.block_on(async {
+    //     let mut tun = Tun::new().await.unwrap();
+    //     tun.run().await
+    // })
+    // .unwrap();
     ()
 }

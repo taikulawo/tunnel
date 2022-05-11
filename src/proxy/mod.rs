@@ -12,6 +12,7 @@ use tokio::{
     net::{TcpSocket, UdpSocket, TcpStream},
 };
 
+mod tun;
 pub enum NetworkType {
     TCP,
     UDP,
