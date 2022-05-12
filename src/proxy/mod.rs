@@ -1,7 +1,7 @@
 use std::{
     io,
     net::{IpAddr, SocketAddr},
-    os::unix::prelude::{FromRawFd, IntoRawFd}, sync::Arc,
+    os::unix::prelude::{FromRawFd, IntoRawFd}, sync::Arc, convert::TryFrom,
 };
 
 use anyhow::Result;
@@ -38,6 +38,12 @@ pub enum Address {
     Ip(SocketAddr)
 }
 
+impl TryFrom<(String, u16)> for Address {
+    type Error = io::Error;
+    fn try_from(value: (String, u16)) -> Result<Self, Self::Error> {
+        Ok(Address::Domain(value.0, value.1))
+    }
+}
 pub enum Network {
     TCP,
     UDP
@@ -50,6 +56,14 @@ pub struct Session {
     pub local_peer: SocketAddr,
     
     pub network: Network
+}
+impl Session {
+    pub fn port (&self) -> u16{
+        match self.destination {
+            Address::Domain(_, p) => p,
+            Address::Ip(addr) => addr.port()
+        }
+    }
 }
 
 pub fn create_bounded_udp_socket(addr: IpAddr) -> io::Result<UdpSocket> {
@@ -154,3 +168,6 @@ pub struct OutboundHandler {
     tcp_handler: Option<AnyTcpOutboundHandler>,
     udp_handler: Option<AnyUdpOutboundHandler>,
 }
+
+pub trait StreamWrapperTrait: AsyncRead + AsyncWrite + Send + Sync + Unpin{}
+impl<T> StreamWrapperTrait for T where T: AsyncRead + AsyncWrite + Send + Sync + Unpin {}

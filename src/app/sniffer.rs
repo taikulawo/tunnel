@@ -18,16 +18,18 @@
 
 // ClientHello 由 record + Handshake Client Hello Request 共同组成
 
-use std::{io, ops::Range, time::Duration, u8};
+use std::{io, ops::Range, time::Duration, u8, task::{Context, Poll}, pin::Pin, cmp::min};
 
 use byteorder::{BigEndian, ByteOrder};
 use libc::truncate;
 use log::debug;
 use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, ReadBuf},
     net::TcpStream,
     time::timeout,
 };
+
+use crate::proxy::StreamWrapperTrait;
 
 // --------------------------------------------------------------|
 // | 0x00, 0x03 | 0x00, 0x00, 0x00| 0x01, 0x01, 0x01, 0x01, 0x01 |
@@ -131,7 +133,9 @@ where
                         let extension = truncate!(slice_at_range(&extensions, 2..4));
                         if ext_type == 0 {
                             let server_name_bytes = truncate!(slice_at_range(&extension, 3..5));
-                            return Ok(Some(String::from_utf8_lossy(&server_name_bytes).into()));
+                            let server_name = String::from_utf8_lossy(&server_name_bytes).into();
+                            debug!("tls record sni {}", server_name);
+                            return Ok(Some(server_name));
                         } else {
                             extensions = truncate!(truncate_before(&extensions, 2..4));
                         }
@@ -150,5 +154,32 @@ where
             stream,
             buf: Vec::with_capacity(2048),
         }
+    }
+}
+
+impl<T: AsyncRead + Unpin> AsyncRead for Sniffer<T>
+{
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+        if !self.buf.is_empty() {
+            // 将 client hello 写到 server
+            let accepted_len = min(self.buf.len(), buf.remaining());
+            buf.put_slice(&self.buf[..accepted_len]);
+            self.buf.drain(..accepted_len);
+            Poll::Ready(Ok(()))
+        }else {
+            AsyncRead::poll_read(self, cx, buf)
+        }
+    }
+}
+
+impl<T: AsyncWrite + Unpin> AsyncWrite for Sniffer<T> {
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        AsyncWrite::poll_flush(Pin::new(&mut self.stream), cx)
+    }
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        AsyncWrite::poll_shutdown(Pin::new(&mut self.stream), cx)
+    }
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
+        AsyncWrite::poll_write(Pin::new(&mut self.stream), cx, buf)
     }
 }

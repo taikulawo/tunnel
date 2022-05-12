@@ -61,8 +61,8 @@ impl InboundListener {
                     local_peer: local
                 };
                 match TcpInboundHandlerTrait::handle(&*handler, session, conn).await {
-                    Ok(InboundResult::Stream(stream, sess)) => {
-                        dispatcher.dispatch_tcp(stream, sess).await;
+                    Ok(InboundResult::Stream(stream, mut sess)) => {
+                        dispatcher.dispatch_tcp(stream, &mut sess).await;
                     },
                     Ok(InboundResult::Datagram(socket, sess)) => {
                         dispatcher.dispatch_udp(socket, sess).await;
