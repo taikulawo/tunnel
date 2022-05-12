@@ -30,3 +30,4 @@ serde_json = { version = "1.0.68", features = ["raw_value"] }
 serde_derive = "1.0.130"
 serde = { version = "1.0" }
 clap="2.33.3"
+byteorder = "1.4.3"
