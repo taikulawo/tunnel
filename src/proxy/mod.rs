@@ -33,6 +33,7 @@ pub struct DomainSession {
     port: u16,
 }
 
+#[derive(Debug)]
 pub enum Address {
     Domain(String, u16),
     Ip(SocketAddr)
@@ -44,11 +45,14 @@ impl TryFrom<(String, u16)> for Address {
         Ok(Address::Domain(value.0, value.1))
     }
 }
+
+#[derive(Debug)]
 pub enum Network {
     TCP,
     UDP
 }
 // connection session
+#[derive(Debug)]
 pub struct Session {
     pub destination: Address,
     // 连接到本地代理服务器的remote

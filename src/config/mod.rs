@@ -9,6 +9,7 @@ use std::{
 #[derive(Clone, Deserialize)]
 pub struct Outbound {
     // socks5, shadowsocks, vmess
+    pub name: String,
     pub protocol: String,
     pub bind: String,
     pub settings: Option<Box<RawValue>>,
@@ -58,12 +59,12 @@ pub struct Inbound {
 
 #[derive(Clone, Deserialize)]
 pub struct Rule {
-    ip: Option<Vec<String>>,
-    portRange: Option<Vec<String>>,
-    domain: Option<Vec<String>>,
-    domainSuffix: Option<Vec<String>>,
-    domainKeyword: Option<Vec<String>>,
-    target: String,
+    pub ip: Option<Vec<String>>,
+    pub portRange: Option<Vec<String>>,
+    pub domain: Option<Vec<String>>,
+    pub domainSuffix: Option<Vec<String>>,
+    pub domainKeyword: Option<Vec<String>>,
+    pub target: String,
 }
 #[derive(Clone, Deserialize)]
 pub struct Config {

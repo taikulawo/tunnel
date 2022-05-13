@@ -11,6 +11,7 @@ mod listener;
 mod inbound;
 mod outbound;
 mod sniffer;
+mod router;
 
 pub struct Context {
     resolver: DnsClient,
