@@ -155,12 +155,12 @@ pub enum OutboundResult {
 }
 
 #[async_trait]
-pub trait TcpOutboundHandlerTrait {
+pub trait TcpOutboundHandlerTrait: Send + Sync + Unpin {
     async fn handle(&self, sess: Session) -> io::Result<OutboundResult>;
 }
 
 #[async_trait]
-pub trait UdpOutboundHandlerTrait {
+pub trait UdpOutboundHandlerTrait: Send + Sync + Unpin {
     async fn handle(&self, sess: Session) -> io::Result<OutboundResult>;
 }
 
@@ -171,6 +171,12 @@ pub struct OutboundHandler {
     tag: String,
     tcp_handler: Option<AnyTcpOutboundHandler>,
     udp_handler: Option<AnyUdpOutboundHandler>,
+}
+
+impl OutboundHandler {
+    pub fn new(tag: String, tcp: Option<AnyTcpOutboundHandler>, udp: Option<AnyUdpOutboundHandler>) -> OutboundHandler {
+        OutboundHandler { tag , tcp_handler: tcp, udp_handler: udp }
+    }
 }
 
 pub trait StreamWrapperTrait: AsyncRead + AsyncWrite + Send + Sync + Unpin{}

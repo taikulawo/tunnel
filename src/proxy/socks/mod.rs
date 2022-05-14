@@ -17,9 +17,11 @@ use crate::proxy::{Address, Session};
 mod inbound;
 mod outbound;
 
-pub use self::inbound::SocksTcpInboundHandler;
-pub use self::inbound::SocksUdpInboundHandler;
+pub use self::inbound::TcpInboundHandler;
+pub use self::inbound::UdpInboundHandler;
 pub use self::outbound::TcpOutboundHandler;
+pub use self::outbound::UdpOutboundHandler;
+
 use super::{Network, RWSocketTrait};
 const NO_AUTHENTICATION_REQUIRED: u8 = 0x01;
 const CMD_CONNECT: u8 = 0x01;

@@ -12,10 +12,10 @@ use crate::{
 use async_trait::async_trait;
 use tokio::net::{TcpStream, UdpSocket};
 
-pub struct SocksTcpInboundHandler;
+pub struct TcpInboundHandler;
 
 #[async_trait]
-impl TcpInboundHandlerTrait for SocksTcpInboundHandler {
+impl TcpInboundHandlerTrait for TcpInboundHandler {
     async fn handle(&self, conn: Session, mut stream: TcpStream) -> io::Result<InboundResult> {
         let session = match handshake_as_server(&mut stream).await {
             Ok(session) => session,
@@ -28,10 +28,10 @@ impl TcpInboundHandlerTrait for SocksTcpInboundHandler {
     }
 }
 
-pub struct SocksUdpInboundHandler;
+pub struct UdpInboundHandler;
 
 #[async_trait]
-impl UdpInboundHandlerTrait for SocksUdpInboundHandler {
+impl UdpInboundHandlerTrait for UdpInboundHandler {
     async fn handle(&self, conn: Session, socket: UdpSocket) -> io::Result<InboundResult> {
         Ok(InboundResult::Datagram(socket, conn))
     }

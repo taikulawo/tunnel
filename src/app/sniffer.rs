@@ -55,7 +55,7 @@ fn slice_at_range(data: &[u8], range: Range<usize>) -> Result<&[u8], String> {
 // |<--2 bytes->|<----3 bytes---->|<-------remaining data------->|
 //  range
 // 保留 remaining data
-pub fn truncate_before(data: &[u8], range: Range<usize>) -> Result<&[u8], String> {
+fn truncate_before(data: &[u8], range: Range<usize>) -> Result<&[u8], String> {
     let len = slice_at_range(data, range.clone())?.len();
     Ok(&data[range.end + len..])
 }

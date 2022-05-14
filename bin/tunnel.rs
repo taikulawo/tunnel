@@ -1,4 +1,4 @@
-use std::{error::Error, io};
+use std::{error::Error, io, sync::Arc};
 
 use clap::Arg;
 use log::error;
@@ -6,7 +6,12 @@ use log4rs::{
     append::console::ConsoleAppender,
     config::{Appender, Logger, Root},
 };
-use tokio::runtime::Builder;
+use tokio::{runtime::Builder, sync::RwLock};
+use tunnel::app::{
+    Router,
+    InboundManager,
+    OutboundManager, Dispatcher, DnsClient
+};
 fn main() {
     let app = clap::App::new("tunnel").arg(
         Arg::with_name("config")
@@ -40,6 +45,13 @@ fn main() {
             return;
         }
     };
+
+    let inbound_manager = Arc::new(InboundManager::new(&config.inbounds));
+    let outbound_manager = Arc::new(OutboundManager::new(&config.outbounds));
+    let router = Arc::new(Router::new(&config.routes));
+    let dns_client = Arc::new(RwLock::new(DnsClient::new(config.clone())));
+    let dispatcher = Dispatcher::new(router, dns_client,outbound_manager, &config);
+
     // rt.block_on(async {
     //     let mut tun = Tun::new().await.unwrap();
     //     tun.run().await

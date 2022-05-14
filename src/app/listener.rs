@@ -9,7 +9,6 @@ use tokio::{
 };
 
 use crate::{
-    app::Context,
     config,
     proxy::{AnyInboundHandler, NetworkType, TransportNetwork, InboundHandler, TcpInboundHandlerTrait, Session, Address, Network, InboundResult},
 };
@@ -18,17 +17,16 @@ use super::dispatcher::Dispatcher;
 
 pub struct InboundListener {
     transport: TransportNetwork,
-    ctx: Arc<Context>,
 }
 type TaskFuture = BoxFuture<'static, Result<()>>;
 impl InboundListener {
     pub async fn listen(
         self,
+        dispatcher: Arc<Dispatcher>,
         handler: AnyInboundHandler,
         addr: SocketAddr,
     ) -> Result<Vec<TaskFuture>> {
         let mut tasks: Vec<TaskFuture> = vec![];
-        let dispatcher = self.ctx.dispatcher.clone();
         if (handler.has_tcp()) {
             // 最初是 self.tcp_listener 写法，但会报
             // `self` does not live long enough, borrowed value does not live long enough. rustcE0597

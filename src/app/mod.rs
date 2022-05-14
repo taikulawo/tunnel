@@ -1,34 +1,27 @@
 use std::sync::Arc;
 
 use crate::{
-    app::{dispatcher::Dispatcher, dns_client::DnsClient},
     config::Config,
 };
 
 mod dispatcher;
+pub use dispatcher::Dispatcher;
+
 mod dns_client;
+pub use dns_client::DnsClient;
+
 mod listener;
+pub use listener::InboundListener;
+
+
 mod inbound;
+pub use inbound::InboundManager;
+
 mod outbound;
+pub use outbound::OutboundManager;
+
 mod sniffer;
+pub use sniffer::Sniffer;
+
 mod router;
-
-pub struct Context {
-    resolver: DnsClient,
-    config: Config,
-    dispatcher: Arc<Dispatcher>,
-}
-
-impl Context {
-    pub fn new() -> Self {
-        let config = Config::default();
-        let resolver = DnsClient::new(config.clone());
-        let dispatcher = Dispatcher {};
-        let ctx = Context {
-            config,
-            resolver,
-            dispatcher: Arc::new(dispatcher),
-        };
-        ctx
-    }
-}
+pub use router::Router;

@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, sync::Arc};
 
 use anyhow::{
     Result,
@@ -11,7 +11,7 @@ use crate::{proxy::{Session, Address}, config::Rule};
 
 
 
-pub trait ConditionMatcher {
+pub trait ConditionMatcher: Sync + Send + Unpin {
     fn apply(&self, sess: &Session) -> bool;
 }
 

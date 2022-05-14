@@ -5,31 +5,10 @@ use log::{
 };
 use anyhow::Result;
 
-use crate::{Config, config::{Socks5InboundSettings, Inbound}, proxy::{socks::{SocksTcpInboundHandler, SocksUdpInboundHandler}, InboundHandlerTrait, InboundHandler, AnyInboundHandler}};
-
-pub async fn inboundInit(config: Arc<Config>) -> Result<()> {
-    let mut inbounds = &config.inbounds;
-    let mut handlers = HashMap::new();
-    for inbound in inbounds {
-        match &*inbound.protocol {
-            "socks" => {
-                if let Some(ref settings) = inbound.settings {
-                    let socks_settings: Socks5InboundSettings = serde_json::from_str(settings.get())?;
-                    let handler = SocksTcpInboundHandler{};
-                    handlers.insert(inbound.tag.clone(), handler);
-                }
-            },
-            _ => {
-                continue
-            }
-        };
-    }
-    todo!()
-}
-
+use crate::{Config, config::{Socks5InboundSettings, Inbound}, proxy::{socks::{TcpInboundHandler, UdpInboundHandler}, InboundHandlerTrait, InboundHandler, AnyInboundHandler}};
 // 统一管理全部 inbound 协议
 pub struct InboundManager {
-
+    handlers: HashMap<String, Arc<InboundHandler>>,
 }
 
 impl InboundManager {
@@ -40,8 +19,8 @@ impl InboundManager {
         for inbound in config.iter() {
             let handler = match &*inbound.tag {
                 "socks" => {
-                    let tcp = Arc::new(SocksTcpInboundHandler);
-                    let udp = Arc::new(SocksUdpInboundHandler);
+                    let tcp = Arc::new(TcpInboundHandler);
+                    let udp = Arc::new(UdpInboundHandler);
                     InboundHandler::new(inbound.tag.clone(), Some(tcp), Some(udp))
                 },
                 _ => {
@@ -52,7 +31,7 @@ impl InboundManager {
             handlers.insert(inbound.tag.clone(), Arc::new(handler));
         }
         InboundManager {
-
+            handlers
         }
     }
     pub async fn listen() {
