@@ -6,13 +6,18 @@ use log4rs::{
     append::console::ConsoleAppender,
     config::{Appender, Logger, Root},
 };
+use anyhow::{
+    Result,
+    anyhow
+};
 use tokio::{runtime::Builder, sync::RwLock};
 use tunnel::app::{
     Router,
     InboundManager,
     OutboundManager, Dispatcher, DnsClient
 };
-fn main() {
+
+fn load() -> Result<()>{
     let app = clap::App::new("tunnel").arg(
         Arg::with_name("config")
             .short("-c")
@@ -42,20 +47,24 @@ fn main() {
         Ok(x) => x,
         Err(err) => {
             error!("failed to load config file {} {}", config_path, err);
-            return;
+            return Err(err);
         }
     };
 
     let inbound_manager = Arc::new(InboundManager::new(&config.inbounds));
-    let outbound_manager = Arc::new(OutboundManager::new(&config.outbounds));
+    let outbound_manager = Arc::new(OutboundManager::new(&config.outbounds)?);
     let router = Arc::new(Router::new(&config.routes));
     let dns_client = Arc::new(RwLock::new(DnsClient::new(config.clone())));
     let dispatcher = Dispatcher::new(router, dns_client,outbound_manager, &config);
 
-    // rt.block_on(async {
-    //     let mut tun = Tun::new().await.unwrap();
-    //     tun.run().await
-    // })
-    // .unwrap();
-    ()
+    rt.block_on(async {
+        // let mut tun = Tun::new().await.unwrap();
+        // tun.run().await
+    });
+    Ok(())
+}
+fn main() {
+    if let Err(err) = load() {
+
+    }
 }

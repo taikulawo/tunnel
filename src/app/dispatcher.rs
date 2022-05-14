@@ -1,9 +1,13 @@
-use std::{convert::TryFrom, sync::Arc, collections::HashMap};
+use std::{convert::TryFrom, sync::Arc, collections::HashMap, net::{SocketAddr}, io};
 
-use log::debug;
+use anyhow::{
+    Result,
+    anyhow
+};
+use log::{debug, error};
 use tokio::{net::{TcpStream, UdpSocket}, sync::RwLock};
 
-use crate::{proxy::{Session, StreamWrapperTrait, Address, OutboundHandler}, Config};
+use crate::{proxy::{Session, StreamWrapperTrait, Address, OutboundHandler, OutboundResult, socks::TcpOutboundHandler, TcpOutboundHandlerTrait, OutboundConnect}, Config};
 
 use super::{sniffer::{Sniffer}, Router, DnsClient, OutboundManager};
 
@@ -11,7 +15,7 @@ use super::{sniffer::{Sniffer}, Router, DnsClient, OutboundManager};
 pub struct Dispatcher {
     router: Arc<Router>,
     dns_client: Arc<RwLock<DnsClient>>,
-    outbound_handlers: HashMap<String, Arc<OutboundHandler>>
+    outbound_manager: Arc<OutboundManager>
 }
 impl Dispatcher {
     pub async fn dispatch_tcp(&self, stream:TcpStream, sess: &mut Session) {
@@ -44,6 +48,40 @@ impl Dispatcher {
             Box::new(stream)
         };
         // starting routing match
+        let outbound_handler = match self.router.route(&sess) {
+            Some(tag) => {
+                match self.outbound_manager.get_handler(&*tag) {
+                    Some(h) => h,
+                    None => {
+                        error!("no outbound tag found {}", tag);
+                        return;
+                    }
+                }
+            },
+            None => {
+                error!("no outbound session {:?} found!", &sess);
+                return;
+            }
+        };
+        // connect to remote proxy server
+        let tcp = if let Some(tcp) = &outbound_handler.tcp_handler {
+            tcp
+        }else {
+            error!("tag {} not have tcp handler !", outbound_handler.tag);
+            return;
+        };
+        let target = TcpOutboundHandlerTrait::remote_addr(tcp.as_ref());
+        let proxy_stream = match target {
+            OutboundConnect::Proxy(name, port) => {
+                connect_remote_tcp(self.dns_client.clone(), name, port).await?
+            },
+            OutboundConnect::Direct => {
+
+            },
+            OutboundConnect::Drop => {
+
+            }
+        }
     }
 
     pub async fn dispatch_udp(&self, socket: UdpSocket, sess: Session) {}
@@ -51,8 +89,37 @@ impl Dispatcher {
     pub fn new(router: Arc<Router>, dns_client: Arc<RwLock<DnsClient>>, outbound_manager: Arc<OutboundManager>, config: &Config) -> Dispatcher{
         Dispatcher {
             dns_client,
-            outbound_handlers: outbound_manager.handlers.clone(),
+            outbound_manager: outbound_manager,
             router
         }
     }
+}
+
+pub async fn connect_remote_tcp(dns_client:Arc<RwLock<DnsClient>>, addr: String, port: u16) -> Result<TcpStream>{
+    let socket_addr = match addr.parse::<SocketAddr>() {
+        Ok(socket_addr) => socket_addr,
+        Err(err) => {
+            // maybe domain name
+            match dns_client.read().await.lookup(&addr).await {
+                Ok(ips) => {
+                    // TODO connect to multiple ips
+                    let ip = if let Some(ip) = ips.get(0) {
+                        ip
+                    }else {
+                        return Err(anyhow!("dns not ip found"))
+                    };
+                    SocketAddr::new(ip.clone(), port)
+                },
+                Err(e) => {
+                    return Err(e)
+                }
+            }
+        }
+    };
+    // 这样可以
+    Ok(TcpStream::connect(socket_addr).await?)
+    // 但下面不行
+    // TcpStream::connect(socket_addr).await
+    // 原因是 ? 进行 type conversion, anyhow::Result 实现了 from io::Error 转换
+    // https://stackoverflow.com/a/62241599/7529562
 }

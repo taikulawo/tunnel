@@ -62,7 +62,7 @@
             "protocol": "socks",
             "settings": {
                 "address": "192.168.3.2",
-                "port": 7890
+                "port": 7890,
             },
             "tag": "socks_out"
         },
@@ -71,6 +71,17 @@
             "bind": "192.168.50.3",
             "protocol": "direct",
             "tag": "direct_out"
+        },
+        {
+            "name":"shadowsocks",
+            "protocol":"shadowsocks",
+            "tag":"shadowsocks_out",
+            "settings": {
+                "method":"aes-gcm-128",
+                "password":"123456",
+                "address":"127.0.0.1",
+                "port": 6666
+            }
         }
     ],
     // route 按照数组顺序，自上而下进行

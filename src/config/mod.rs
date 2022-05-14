@@ -26,18 +26,19 @@ pub struct GeneralSettings {
 pub struct Socks5InboundSettings {
     pub address: String,
     pub port: u16,
-    pub method: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Socks5OutboundSettings {
     pub address: String,
     pub port: u16,
-    pub method: String,
+    pub method: String
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ShadowsocksInboundSettings {
+    pub address: String,
+    pub port: u16,
     pub method: String,
     pub password: String,
 }
@@ -47,6 +48,7 @@ pub struct ShadowsocksOutboundSettings {
     pub address: String,
     pub port: u16,
     pub password: String,
+    pub method: String,
 }
 
 #[derive(Clone, Deserialize)]

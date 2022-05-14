@@ -65,7 +65,7 @@ impl DnsClient {
     }
 
     /// domain string to ip
-    pub async fn lookup(&self, host: String) -> Result<Vec<IpAddr>> {
+    pub async fn lookup(&self, host: &String) -> Result<Vec<IpAddr>> {
         let GeneralSettings {
             prefer_ipv6,
             use_ipv6,
@@ -75,7 +75,7 @@ impl DnsClient {
         match (use_ipv6, prefer_ipv6) {
             (true, true) => {
                 // only wait ipv6 result
-                let query = self.new_query(&host, RecordType::AAAA);
+                let query = self.new_query(host, RecordType::AAAA);
                 let server = random_get!(self.remote_dns_servers);
                 let v = query.to_vec()?;
                 let task = DnsClient::do_lookup(v, &*host, server).boxed();

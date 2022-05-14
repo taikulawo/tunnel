@@ -33,7 +33,7 @@ pub struct DomainSession {
     port: u16,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Address {
     Domain(String, u16),
     Ip(SocketAddr)
@@ -46,13 +46,13 @@ impl TryFrom<(String, u16)> for Address {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Network {
     TCP,
     UDP
 }
 // connection session
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Session {
     pub destination: Address,
     // 连接到本地代理服务器的remote
@@ -145,17 +145,27 @@ pub trait UdpInboundHandlerTrait {
     async fn handle(&self, session: Session, socket: tokio::net::UdpSocket) -> io::Result<InboundResult>;
 }
 
-
 // OUTBOUND
-
-
 pub enum OutboundResult {
     Stream(TcpStream),
     Datagram(UdpSocket),
 }
 
+pub enum OutboundConnect {
+    // used by socks, shadowsocks ... proxy protocol
+    // String can be socketaddr or domain name
+    Proxy(String, u16),
+    // direct protocol
+    Direct,
+    // drop
+    Drop
+}
+
 #[async_trait]
 pub trait TcpOutboundHandlerTrait: Send + Sync + Unpin {
+    // remote addr should be connected directly
+    // no proxy involved
+    fn remote_addr(&self) -> OutboundConnect;
     async fn handle(&self, sess: Session) -> io::Result<OutboundResult>;
 }
 
@@ -166,11 +176,13 @@ pub trait UdpOutboundHandlerTrait: Send + Sync + Unpin {
 
 pub type AnyTcpOutboundHandler = Arc<dyn TcpOutboundHandlerTrait>;
 pub type AnyUdpOutboundHandler = Arc<dyn UdpOutboundHandlerTrait>;
+pub trait AnyOutboundHandlerTrait: TcpOutboundHandlerTrait + UdpOutboundHandlerTrait + Unpin + Send + Sync {}
+pub type AnyOutboundHandler = Arc<dyn AnyOutboundHandlerTrait>;
 
 pub struct OutboundHandler {
-    tag: String,
-    tcp_handler: Option<AnyTcpOutboundHandler>,
-    udp_handler: Option<AnyUdpOutboundHandler>,
+    pub tag: String,
+    pub tcp_handler: Option<AnyTcpOutboundHandler>,
+    pub udp_handler: Option<AnyUdpOutboundHandler>,
 }
 
 impl OutboundHandler {
@@ -181,3 +193,4 @@ impl OutboundHandler {
 
 pub trait StreamWrapperTrait: AsyncRead + AsyncWrite + Send + Sync + Unpin{}
 impl<T> StreamWrapperTrait for T where T: AsyncRead + AsyncWrite + Send + Sync + Unpin {}
+
