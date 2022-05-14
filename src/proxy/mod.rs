@@ -30,10 +30,6 @@ pub struct TransportNetwork {
 }
 pub mod socks;
 
-pub trait RWSocketTrait: AsyncRead + AsyncWrite + Unpin + Sync + Send {}
-
-pub type RWSocket = Box<dyn RWSocketTrait>;
-
 pub struct DomainSession {
     name: String,
     port: u16,
@@ -162,10 +158,6 @@ pub trait UdpInboundHandlerTrait {
 }
 
 // OUTBOUND
-pub enum OutboundResult {
-    Stream(TcpStream),
-    Datagram(UdpSocket),
-}
 
 pub enum OutboundConnect {
     // used by socks, shadowsocks ... proxy protocol
@@ -182,7 +174,7 @@ pub trait TcpOutboundHandlerTrait: Send + Sync + Unpin {
     // remote addr should be connected directly
     // no proxy involved
     // fn remote_addr(&self) -> OutboundConnect;
-    async fn handle(&self, ctx: Arc<Context>, sess: &Session) -> Result<OutboundResult, Error>;
+    async fn handle(&self, ctx: Arc<Context>, sess: &Session) -> Result<TcpStream, Error>;
 }
 
 #[derive(Error, Debug)]
@@ -193,7 +185,7 @@ pub enum Error {
 
 #[async_trait]
 pub trait UdpOutboundHandlerTrait: Send + Sync + Unpin {
-    async fn handle(&self, ctx: Arc<Context>, sess: &Session) -> Result<OutboundResult, Error>;
+    async fn handle(&self, ctx: Arc<Context>, sess: &Session) -> Result<UdpSocket, Error>;
 }
 
 pub type AnyTcpOutboundHandler = Arc<dyn TcpOutboundHandlerTrait>;

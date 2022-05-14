@@ -22,7 +22,7 @@ pub use self::inbound::UdpInboundHandler;
 pub use self::outbound::TcpOutboundHandler;
 pub use self::outbound::UdpOutboundHandler;
 
-use super::{Network, RWSocketTrait};
+use super::{Network, StreamWrapperTrait};
 const NO_AUTHENTICATION_REQUIRED: u8 = 0x01;
 const CMD_CONNECT: u8 = 0x01;
 const CMD_BIND: u8 = 0x02;
@@ -33,7 +33,7 @@ const TYPE_IPV6: u8 = 0x04;
 // as client
 async fn handshake_as_client<T>(stream: &mut T, session: &Session) -> Result<()>
 where
-    T: RWSocketTrait,
+    T: StreamWrapperTrait,
 {
     stream.write_all(&[0x05, 0x01, 0x00]).await?;
     let mut buf = vec![0u8; 2];

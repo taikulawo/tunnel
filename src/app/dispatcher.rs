@@ -1,15 +1,21 @@
-use std::{convert::TryFrom, sync::Arc, collections::HashMap, net::{SocketAddr}, io};
+use std::{collections::HashMap, convert::TryFrom, io, net::SocketAddr, sync::Arc};
 
-use anyhow::{
-    Result,
-    anyhow,
-};
+use anyhow::{anyhow, Result};
 use log::{debug, error};
-use tokio::{net::{TcpStream, UdpSocket}, sync::RwLock};
+use tokio::{
+    net::{TcpStream, UdpSocket},
+    sync::RwLock,
+};
 
-use crate::{proxy::{Session, StreamWrapperTrait, Address, OutboundHandler, OutboundResult, socks::TcpOutboundHandler, TcpOutboundHandlerTrait, OutboundConnect, Error}, Config, Context};
+use crate::{
+    proxy::{
+        socks::TcpOutboundHandler, Address, Error, OutboundConnect, OutboundHandler, Session,
+        StreamWrapperTrait, TcpOutboundHandlerTrait,
+    },
+    Config, Context,
+};
 
-use super::{sniffer::{Sniffer}, Router, DnsClient, OutboundManager};
+use super::{sniffer::Sniffer, DnsClient, OutboundManager, Router};
 
 // 负责将请求分发给不同的 代理协议 处理
 pub struct Dispatcher {
@@ -19,44 +25,40 @@ pub struct Dispatcher {
     outbound_manager: Arc<OutboundManager>,
 }
 impl Dispatcher {
-    pub async fn dispatch_tcp(&self, stream:TcpStream, sess: &mut Session) {
+    pub async fn dispatch_tcp(&self, stream: TcpStream, sess: &mut Session) {
         // https://github.com/iamwwc/v2ray-core/blob/8cdd680f5ca8d05c618752eb944a42a7b4d31f6c/app/dispatcher/default.go#L207
         // 由于需要提供 domain routing，所以如果 port == 443，首先尝试嗅探 TLS SNI
-        let local_stream: Box<dyn StreamWrapperTrait> = if sess.local_peer.port() == 443 {
+        let mut local_stream: Box<dyn StreamWrapperTrait> = if sess.local_peer.port() == 443 {
             // TLS，嗅探 SNI
             let mut sniffer = Sniffer::new(stream);
             match sniffer.sniff().await {
                 Ok(s) => {
                     match s {
-                        Some(name) =>  {
+                        Some(name) => {
                             sess.destination = match Address::try_from((name, sess.port())) {
                                 Ok(x) => x,
-                                Err(err) =>{
+                                Err(err) => {
                                     debug!("try from failed {}", err);
-                                    return
+                                    return;
                                 }
                             };
-                        },
+                        }
                         None => {}
                     }
                     Box::new(sniffer)
-                },
-                Err(err) => {
-                    return
                 }
+                Err(err) => return,
             }
-        }else {
+        } else {
             Box::new(stream)
         };
         // starting routing match
         let outbound_handler = match self.router.route(&sess) {
-            Some(tag) => {
-                match self.outbound_manager.get_handler(&*tag) {
-                    Some(h) => h,
-                    None => {
-                        error!("no outbound tag found {}", tag);
-                        return;
-                    }
+            Some(tag) => match self.outbound_manager.get_handler(&*tag) {
+                Some(h) => h,
+                None => {
+                    error!("no outbound tag found {}", tag);
+                    return;
                 }
             },
             None => {
@@ -67,39 +69,45 @@ impl Dispatcher {
         // connect to remote proxy server
         let tcp = if let Some(tcp) = &outbound_handler.tcp_handler {
             tcp
-        }else {
+        } else {
             error!("tag {} not have tcp handler !", outbound_handler.tag);
             return;
         };
-        let remote_stream = match TcpOutboundHandlerTrait::handle(tcp.as_ref(),self.ctx.clone(), sess).await {
-            Ok(res) => res,
-            Err(err) => {
-                match &err {
-                    Error::ConnectError(name, port) => {
-                        debug!(
-                            "connect to proxy {}:{}. failed.err{}, connection {} -> {}",
-                            name,
-                            port, 
-                            err,
-                            sess.local_peer,
-                            sess.destination
-                        );
+        let mut remote_stream =
+            match TcpOutboundHandlerTrait::handle(tcp.as_ref(), self.ctx.clone(), sess).await {
+                Ok(res) => res,
+                Err(err) => {
+                    match &err {
+                        Error::ConnectError(name, port) => {
+                            debug!(
+                                "connect to proxy {}:{}. failed.err{}, connection {} -> {}",
+                                name, port, err, sess.local_peer, sess.destination
+                            );
+                        }
+                        _ => (),
                     }
-                    _ => (),
+                    return;
                 }
-                return;
-            }
-        };
+            };
+        // start pipe
+
+        tokio::io::copy_bidirectional(&mut local_stream, &mut remote_stream).await;
     }
 
     pub async fn dispatch_udp(&self, socket: UdpSocket, sess: Session) {}
 
-    pub fn new(context: Arc<Context>, router: Arc<Router>, dns_client: Arc<RwLock<DnsClient>>, outbound_manager: Arc<OutboundManager>, config: &Config) -> Dispatcher{
+    pub fn new(
+        context: Arc<Context>,
+        router: Arc<Router>,
+        dns_client: Arc<RwLock<DnsClient>>,
+        outbound_manager: Arc<OutboundManager>,
+        config: &Config,
+    ) -> Dispatcher {
         Dispatcher {
             ctx: context,
             dns_client,
             outbound_manager: outbound_manager,
-            router
+            router,
         }
     }
 }
