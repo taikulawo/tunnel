@@ -1,11 +1,14 @@
-use std::{io, net::SocketAddr};
+use std::{io, net::SocketAddr, sync::Arc};
 
-use anyhow::Result;
 use async_trait::async_trait;
 use tokio::io::AsyncWriteExt;
 
 use crate::{
-    proxy::{Address, Session, OutboundResult, UdpOutboundHandlerTrait, TcpOutboundHandlerTrait, OutboundConnect},
+    proxy::{
+        connect_to_remote_tcp, Address, Error, OutboundConnect, OutboundResult, Session,
+        TcpOutboundHandlerTrait, UdpOutboundHandlerTrait,
+    },
+    Context,
 };
 
 pub struct TcpOutboundHandler {
@@ -15,12 +18,12 @@ pub struct TcpOutboundHandler {
 
 #[async_trait]
 impl TcpOutboundHandlerTrait for TcpOutboundHandler {
-    async fn handle(&self, session: Session) -> io::Result<OutboundResult> {
-        
+    async fn handle(&self, ctx: Arc<Context>, session: &Session) -> Result<OutboundResult, Error> {
+        let stream = match connect_to_remote_tcp(ctx.dns_client.clone(), &self.addr, self.port).await {
+            Ok(stream) => stream,
+            Err(err) => return Err(Error::ConnectError(self.addr.clone(), self.port)),
+        };
         todo!()
-    }
-    fn remote_addr(&self) -> OutboundConnect{
-        OutboundConnect::Proxy(self.addr.clone(), self.port)
     }
 }
 
@@ -31,7 +34,7 @@ pub struct UdpOutboundHandler {
 
 #[async_trait]
 impl UdpOutboundHandlerTrait for UdpOutboundHandler {
-    async fn handle(&self, session: Session) -> io::Result<OutboundResult> {
+    async fn handle(&self, ctx: Arc<Context>, session: &Session) -> Result<OutboundResult, Error> {
         todo!()
     }
 }

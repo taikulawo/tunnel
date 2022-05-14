@@ -1,23 +1,19 @@
 use std::{error::Error, io, sync::Arc};
 
+use anyhow::{anyhow, Result};
 use clap::Arg;
 use log::error;
 use log4rs::{
     append::console::ConsoleAppender,
     config::{Appender, Logger, Root},
 };
-use anyhow::{
-    Result,
-    anyhow
-};
 use tokio::{runtime::Builder, sync::RwLock};
-use tunnel::app::{
-    Router,
-    InboundManager,
-    OutboundManager, Dispatcher, DnsClient
+use tunnel::{
+    app::{Dispatcher, DnsClient, InboundManager, OutboundManager, Router},
+    Context,
 };
 
-fn load() -> Result<()>{
+fn load() -> Result<()> {
     let app = clap::App::new("tunnel").arg(
         Arg::with_name("config")
             .short("-c")
@@ -55,7 +51,15 @@ fn load() -> Result<()>{
     let outbound_manager = Arc::new(OutboundManager::new(&config.outbounds)?);
     let router = Arc::new(Router::new(&config.routes));
     let dns_client = Arc::new(RwLock::new(DnsClient::new(config.clone())));
-    let dispatcher = Dispatcher::new(router, dns_client,outbound_manager, &config);
+
+    let context = Arc::new(Context::new(dns_client.clone()));
+    let dispatcher = Dispatcher::new(
+        context,
+        router,
+        dns_client.clone(),
+        outbound_manager,
+        &config,
+    );
 
     rt.block_on(async {
         // let mut tun = Tun::new().await.unwrap();
@@ -64,7 +68,5 @@ fn load() -> Result<()>{
     Ok(())
 }
 fn main() {
-    if let Err(err) = load() {
-
-    }
+    if let Err(err) = load() {}
 }
