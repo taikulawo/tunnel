@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use log::{debug, error};
 use tokio::{
     net::{TcpStream, UdpSocket},
-    sync::RwLock,
+    sync::RwLock, io::AsyncReadExt,
 };
 
 use crate::{
@@ -90,7 +90,6 @@ impl Dispatcher {
                 }
             };
         // start pipe
-
         tokio::io::copy_bidirectional(&mut local_stream, &mut remote_stream).await;
     }
 

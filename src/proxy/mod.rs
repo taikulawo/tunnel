@@ -2,7 +2,7 @@ use core::fmt;
 use std::{
     io,
     net::{IpAddr, SocketAddr},
-    os::unix::prelude::{FromRawFd, IntoRawFd}, sync::Arc, convert::TryFrom, fmt::Display,
+    os::unix::prelude::{FromRawFd, IntoRawFd}, sync::Arc, convert::TryFrom, fmt::Display, ops::Add,
 };
 
 use anyhow::{
@@ -40,6 +40,21 @@ pub enum Address {
     Domain(String, u16),
     Ip(SocketAddr)
 }
+impl Address {
+    pub fn port(&self) -> u16 {
+        match self {
+            Address::Domain(_, port) => *port,
+            Address::Ip(addr) => addr.port()
+        }
+    }
+    pub fn host(&self) -> String {
+        match self {
+            Address::Domain(n,_ ) => n.clone(),
+            Address::Ip(addr) => addr.to_string()
+        }
+    }
+}
+
 
 impl Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -57,6 +72,34 @@ impl TryFrom<(String, u16)> for Address {
         Ok(Address::Domain(value.0, value.1))
     }
 }
+
+impl Into<String> for Address {
+    fn into(self) -> String {
+        match self {
+            Address::Domain(name, port) => {
+                format!("{}:{}",name, port)
+            },
+            Address::Ip(addr) => addr.to_string()
+        }
+    }
+}
+
+impl From<String> for Address {
+    fn from(s: String) -> Self {
+        let address = match s.parse::<SocketAddr>(){
+            Ok(res) => Self::Ip(res),
+            Err(err) => {
+                // maybe a domain name
+                // if it's a bad domain:port, exception will raise when connect to it
+                let parts: Vec<&str> = s.split(':').collect();
+                let port = u16::from_str_radix(*parts.get(0).unwrap_or(&"0"), 10).unwrap();
+                Self::Domain(s, port)
+            }
+        };
+        address
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub enum Network {
@@ -209,12 +252,20 @@ pub trait StreamWrapperTrait: AsyncRead + AsyncWrite + Send + Sync + Unpin{}
 impl<T> StreamWrapperTrait for T where T: AsyncRead + AsyncWrite + Send + Sync + Unpin {}
 
 
-pub async fn connect_to_remote_tcp(dns_client:Arc<RwLock<DnsClient>>, addr: &String, port: u16) -> anyhow::Result<TcpStream>{
-    let socket_addr = match addr.parse::<SocketAddr>() {
-        Ok(socket_addr) => socket_addr,
-        Err(err) => {
-            // maybe domain name
-            match dns_client.read().await.lookup(&addr).await {
+pub async fn connect_to_remote_tcp(dns_client:Arc<RwLock<DnsClient>>, addr: Address) -> anyhow::Result<TcpStream>{
+    let socket_addr = name_to_socket_addr(dns_client, addr).await?;
+    // 这样可以
+    Ok(TcpStream::connect(socket_addr).await?)
+    // 但下面不行
+    // TcpStream::connect(socket_addr).await
+    // 原因是 ? 进行 type conversion, anyhow::Result 实现了 from io::Error 转换
+    // https://stackoverflow.com/a/62241599/7529562
+}
+
+pub async fn name_to_socket_addr(dns_client: Arc<RwLock<DnsClient>>, addr: Address) -> anyhow::Result<SocketAddr> {
+    let socket_addr = match addr {
+        Address::Domain(name, port) => {
+            match dns_client.read().await.lookup(&format!("{}:{}", name, port)).await {
                 Ok(ips) => {
                     // TODO connect to multiple ips
                     let ip = if let Some(ip) = ips.get(0) {
@@ -228,12 +279,15 @@ pub async fn connect_to_remote_tcp(dns_client:Arc<RwLock<DnsClient>>, addr: &Str
                     return Err(e)
                 }
             }
-        }
+        },
+        Address::Ip(addr) => addr
     };
-    // 这样可以
-    Ok(TcpStream::connect(socket_addr).await?)
-    // 但下面不行
-    // TcpStream::connect(socket_addr).await
-    // 原因是 ? 进行 type conversion, anyhow::Result 实现了 from io::Error 转换
-    // https://stackoverflow.com/a/62241599/7529562
+    Ok(socket_addr)
+}
+
+pub async fn connect_to_remote_udp(dns_client: Arc<RwLock<DnsClient>>, local: SocketAddr, peer: Address) -> anyhow::Result<UdpSocket> {
+    let socket = UdpSocket::bind(local).await?;
+    let socket_addr = name_to_socket_addr(dns_client, peer).await?;
+    UdpSocket::connect(&socket, socket_addr).await?;
+    Ok(socket)
 }

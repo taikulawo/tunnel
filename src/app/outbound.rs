@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, convert::TryFrom};
 use anyhow::{
     anyhow,
     Result
@@ -7,7 +7,7 @@ use log::{error, info};
 
 use crate::{
     config::{Outbound, Socks5OutboundSettings},
-    proxy::{socks, OutboundHandler},
+    proxy::{socks, OutboundHandler, Address},
 };
 
 // 管理全部的传出协议 outbound
@@ -34,9 +34,17 @@ impl OutboundManager {
                             continue;
                         }
                     };
+                    let socks_addr = socks_settings.address.clone();
+                    let socks_port = socks_settings.port;
+                    let addr = match Address::try_from((socks_addr.clone(), socks_port)) {
+                        Ok(r) => r,
+                        Err(err) => {
+                            error!("bad socks addr found {}:{}", socks_addr, socks_port);
+                            continue
+                        }
+                    };
                     let tcp = Arc::new(socks::TcpOutboundHandler {
-                        addr: socks_settings.address.clone(),
-                        port: socks_settings.port,
+                        address: addr
                     });
                     let udp = Arc::new(socks::UdpOutboundHandler {
                         addr: socks_settings.address.clone(),
@@ -49,6 +57,9 @@ impl OutboundManager {
                     ))
                 }
                 "shadowsocks" => {
+                    todo!()
+                }
+                "direct" => {
                     todo!()
                 }
                 _ => {
