@@ -90,7 +90,20 @@ where
     T: AsyncRead + AsyncWrite + Unpin,
 {
     pub async fn sniff(&mut self) -> io::Result<Option<String>> {
-        let mut buf = Vec::with_capacity(2048);
+        // let buf0: Vec<u8> = Vec::with_capacity(2048);
+        // assert!(buf0.len() == 0);
+        // assert!((&*buf0).len() == 0);
+
+        // with_capacity len 是 0，所以 deref 时 [u8] len 也是 0
+        // stream.read 接受 ReadBuf，ReadBuf 会从 [u8] 初始化，导致 [u8] len 也是 0
+        // 最终ReadBuf#remaining() 始终为 0，ReadBuf#put_slice 写不进数据 
+        
+        // 而 vec! 会将 len 设置为 2048
+        // let buf1 = vec![0u8; 2048];
+        // assert!(buf1.len() != 0);
+        // assert!((&*buf1).len() != 0);
+
+        let mut buf = vec![0u8; 2048];
         let wait = Duration::from_millis(500);
         for i in 1..3 {
             match timeout(wait, self.stream.read(&mut buf)).await? {
