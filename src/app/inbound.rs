@@ -1,18 +1,29 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use log::{
-    info
-};
 use anyhow::Result;
+use futures::FutureExt;
+use futures_util::future::BoxFuture;
+use log::{error, info};
+use std::str::FromStr;
+use std::sync::Arc;
+use std::{collections::HashMap, net::SocketAddr};
 
-use crate::{Config, config::{Socks5InboundSettings, Inbound}, proxy::{socks::{TcpInboundHandler, UdpInboundHandler}, InboundHandlerTrait, InboundHandler, AnyInboundHandler}};
+use crate::{
+    config::{Inbound, Socks5InboundSettings},
+    proxy::{
+        socks::{TcpInboundHandler, UdpInboundHandler},
+        AnyInboundHandler, InboundHandler, InboundHandlerTrait,
+    },
+    Config,
+};
+
+use super::{Dispatcher, InboundListener};
 // 统一管理全部 inbound 协议
 pub struct InboundManager {
     handlers: HashMap<String, Arc<InboundHandler>>,
+    configs: Vec<Inbound>,
 }
 
 impl InboundManager {
-    pub fn new(config: &Vec<Inbound>) -> InboundManager {
+    pub fn new(config: Vec<Inbound>) -> InboundManager {
         let mut handlers: HashMap<String, Arc<InboundHandler>> = HashMap::new();
 
         // 迭代全部的inbound协议，并创建listener
@@ -22,19 +33,36 @@ impl InboundManager {
                     let tcp = Arc::new(TcpInboundHandler);
                     let udp = Arc::new(UdpInboundHandler);
                     InboundHandler::new(inbound.tag.clone(), Some(tcp), Some(udp))
-                },
+                }
                 _ => {
                     info!("unknown tag {}", inbound.tag);
-                    continue;               
+                    continue;
                 }
             };
             handlers.insert(inbound.tag.clone(), Arc::new(handler));
         }
         InboundManager {
-            handlers
+            handlers,
+            configs: config,
         }
     }
-    pub async fn listen() {
-
+    pub async fn listen(mut self, dispatcher: Arc<Dispatcher>) -> BoxFuture<'static, ()> {
+        let mut tasks = Vec::new();
+        for config in self.configs {
+            let dispatcher = dispatcher.clone();
+            if let Some(handler) = self.handlers.get_mut(&config.tag) {
+                let Inbound { port, listen, .. } = config;
+                let addr = match SocketAddr::from_str(format!("{}:{}", listen, port).as_str()) {
+                    Ok(x) => x,
+                    Err(err) => {
+                        error!("invalid listen or port field {}", err);
+                        continue;
+                    }
+                };
+                let future = InboundListener::listen(dispatcher, handler.clone(), addr);
+                tasks.push(future);
+            }
+        }
+        futures::future::join_all(tasks).map(|x| ()).boxed()
     }
 }

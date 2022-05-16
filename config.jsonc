@@ -38,16 +38,15 @@
             "tag": "tun_in"
         },
         {
+            "port": 1080,
+            "listen":"127.0.0.1",
             "protocol": "socks",
-            "settings": {
-                "address": "1.2.3.4",
-                "port": 1080
-            },
+            "settings": {},
             "tag": "socks_out"
         },
         {
             "protocol": "trojan",
-            "address": "127.0.0.1",
+            "listen": "127.0.0.1",
             "port": 10086,
             "settings": {
                 "password": "123456"
@@ -57,23 +56,18 @@
     ],
     "outbounds": [
         {
-            "name":"socks",
-            "bind": "192.168.50.3",
             "protocol": "socks",
             "settings": {
                 "address": "192.168.3.2",
-                "port": 7890,
+                "port": 7890
             },
             "tag": "socks_out"
         },
         {
-            "name": "direct",
-            "bind": "192.168.50.3",
             "protocol": "direct",
             "tag": "direct_out"
         },
         {
-            "name":"shadowsocks",
             "protocol":"shadowsocks",
             "tag":"shadowsocks_out",
             "settings": {

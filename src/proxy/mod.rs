@@ -169,11 +169,37 @@ pub enum InboundResult {
 pub type AnyTcpInboundHandler = Arc<dyn TcpInboundHandlerTrait>;
 pub type AnyUdpInboundHandler = Arc<dyn UdpInboundHandlerTrait>;
 pub type AnyInboundHandler = Arc<dyn InboundHandlerTrait>;
+pub trait InboundHandlerTrait: TcpInboundHandlerTrait + UdpInboundHandlerTrait + Sync + Send {
+    fn has_tcp(&self) -> bool;
+    fn has_udp(&self) -> bool;
+}
 
 pub struct InboundHandler {
     tag: String,
     tcp_handler: Option<AnyTcpInboundHandler>,
     udp_handler: Option<AnyUdpInboundHandler>,
+}
+
+impl InboundHandlerTrait for InboundHandler {
+    fn has_tcp(&self) -> bool {
+        self.tcp_handler.is_some()
+    }
+    fn has_udp(&self) -> bool {
+        self.udp_handler.is_some()
+    }
+}
+
+#[async_trait]
+impl TcpInboundHandlerTrait for InboundHandler {
+    async fn handle(&self, sess: Session, stream: TcpStream) -> io::Result<InboundResult> {
+        todo!()
+    }
+}
+#[async_trait]
+impl UdpInboundHandlerTrait for InboundHandler {
+    async fn handle(&self, sess: Session, socket: UdpSocket) -> io::Result<InboundResult> {
+        todo!()
+    }
 }
 
 impl InboundHandler {
@@ -186,18 +212,14 @@ impl InboundHandler {
     }
 }
 
-pub trait InboundHandlerTrait: TcpInboundHandlerTrait + UdpInboundHandlerTrait + Sync + Send {
-    fn has_tcp(&self) -> bool;
-    fn has_udp(&self) -> bool;
-}
 
 #[async_trait]
-pub trait TcpInboundHandlerTrait {
+pub trait TcpInboundHandlerTrait: Sync + Send + Unpin {
     async fn handle(&self, session: Session, stream: TcpStream) -> io::Result<InboundResult>;
 }
 
 #[async_trait]
-pub trait UdpInboundHandlerTrait {
+pub trait UdpInboundHandlerTrait: Sync + Send + Unpin {
     async fn handle(&self, session: Session, socket: tokio::net::UdpSocket) -> io::Result<InboundResult>;
 }
 

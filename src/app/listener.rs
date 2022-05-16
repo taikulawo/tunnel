@@ -16,13 +16,10 @@ use crate::{
 
 use super::dispatcher::Dispatcher;
 
-pub struct InboundListener {
-    transport: TransportNetwork,
-}
+pub struct InboundListener {}
 type TaskFuture = BoxFuture<'static, Result<()>>;
 impl InboundListener {
     pub async fn listen(
-        self,
         dispatcher: Arc<Dispatcher>,
         handler: AnyInboundHandler,
         addr: SocketAddr,

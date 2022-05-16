@@ -21,6 +21,7 @@ struct UdpOutboundHandler{}
 #[async_trait]
 impl UdpOutboundHandlerTrait for UdpOutboundHandler {
     async fn handle(&self, ctx: Arc<Context>, sess: &Session) -> anyhow::Result<UdpSocket> {
-        connect_to_remote_udp(ctx.dns_client.clone(), sess.local_peer, sess.destination.clone()).await
+        connect_to_remote_udp(ctx.dns_client.clone(), sess.local_peer, sess.destination.clone()
+    ).await
     }
 }

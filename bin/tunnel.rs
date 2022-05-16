@@ -2,6 +2,7 @@ use std::{error::Error, io, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use clap::Arg;
+use futures::future;
 use log::error;
 use log4rs::{
     append::console::ConsoleAppender,
@@ -46,27 +47,27 @@ fn load() -> Result<()> {
             return Err(err);
         }
     };
-
-    let inbound_manager = Arc::new(InboundManager::new(&config.inbounds));
+    let mut tasks = Vec::new();
+    let inbound_manager = InboundManager::new(config.inbounds.clone());
     let outbound_manager = Arc::new(OutboundManager::new(&config.outbounds)?);
     let router = Arc::new(Router::new(&config.routes));
     let dns_client = Arc::new(RwLock::new(DnsClient::new(config.clone())));
 
     let context = Arc::new(Context::new(dns_client.clone()));
-    let dispatcher = Dispatcher::new(
+    let dispatcher = Arc::new(Dispatcher::new(
         context,
         router,
         dns_client.clone(),
         outbound_manager,
         &config,
-    );
+    ));
+    tasks.push(inbound_manager.listen(dispatcher.clone()));
 
-    rt.block_on(async {
-        // let mut tun = Tun::new().await.unwrap();
-        // tun.run().await
-    });
+    rt.block_on(future::join_all(tasks));
     Ok(())
 }
 fn main() {
-    if let Err(err) = load() {}
+    if let Err(err) = load() {
+        error!("{}", err);
+    }
 }

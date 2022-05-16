@@ -6,12 +6,20 @@ use std::{
     fs::{self, File},
     net::SocketAddr,
 };
+
+// https://v2ray.com/chapter_02/01_overview.html
+#[derive(Clone, Deserialize)]
+pub struct Config {
+    pub general: GeneralSettings,
+    pub inbounds: Vec<Inbound>,
+    pub outbounds: Vec<Outbound>,
+    pub routes: Vec<Rule>,
+    pub dns: Option<DnsConfig>,
+}
+
 #[derive(Clone, Deserialize)]
 pub struct Outbound {
-    // socks5, shadowsocks, vmess
-    pub name: String,
     pub protocol: String,
-    pub bind: String,
     pub settings: Option<Box<RawValue>>,
     pub tag: String,
 }
@@ -23,16 +31,12 @@ pub struct GeneralSettings {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct Socks5InboundSettings {
-    pub address: String,
-    pub port: u16,
-}
+pub struct Socks5InboundSettings {}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Socks5OutboundSettings {
     pub address: String,
-    pub port: u16,
-    pub method: String
+    pub port: u16
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -53,6 +57,8 @@ pub struct ShadowsocksOutboundSettings {
 
 #[derive(Clone, Deserialize)]
 pub struct Inbound {
+    pub port: u16, 
+    pub listen: String,
     pub protocol: String,
     pub tag: String,
     // domain or socket addr
@@ -67,14 +73,6 @@ pub struct Rule {
     pub domainSuffix: Option<Vec<String>>,
     pub domainKeyword: Option<Vec<String>>,
     pub target: String,
-}
-#[derive(Clone, Deserialize)]
-pub struct Config {
-    pub general: GeneralSettings,
-    pub inbounds: Vec<Inbound>,
-    pub outbounds: Vec<Outbound>,
-    pub routes: Vec<Rule>,
-    pub dns: Option<DnsConfig>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
