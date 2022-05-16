@@ -20,15 +20,8 @@ pub struct TcpOutboundHandler {
 
 #[async_trait]
 impl TcpOutboundHandlerTrait for TcpOutboundHandler {
-    async fn handle(&self, ctx: Arc<Context>, session: &Session) -> Result<TcpStream, Error> {
-        let mut stream =
-            match connect_to_remote_tcp(ctx.dns_client.clone(), self.address.clone()).await {
-                Ok(stream) => stream,
-                Err(err) => {
-                    debug!("{}", err);
-                    return Err(Error::ConnectError(self.address.host(), self.address.port()));
-                }
-            };
+    async fn handle(&self, ctx: Arc<Context>, session: &Session) -> anyhow::Result<TcpStream> {
+        let mut stream = connect_to_remote_tcp(ctx.dns_client.clone(), self.address.clone()).await?;
         match handshake_as_client(&mut stream, &session).await {
             Err(err) => {
                 debug!("{}", err);
@@ -46,7 +39,7 @@ pub struct UdpOutboundHandler {
 
 #[async_trait]
 impl UdpOutboundHandlerTrait for UdpOutboundHandler {
-    async fn handle(&self, ctx: Arc<Context>, session: &Session) -> Result<UdpSocket, Error> {
+    async fn handle(&self, ctx: Arc<Context>, session: &Session) -> anyhow::Result<UdpSocket> {
         todo!()
     }
 }

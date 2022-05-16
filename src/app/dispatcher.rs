@@ -3,8 +3,9 @@ use std::{collections::HashMap, convert::TryFrom, io, net::SocketAddr, sync::Arc
 use anyhow::{anyhow, Result};
 use log::{debug, error};
 use tokio::{
+    io::AsyncReadExt,
     net::{TcpStream, UdpSocket},
-    sync::RwLock, io::AsyncReadExt,
+    sync::RwLock,
 };
 
 use crate::{
@@ -77,15 +78,10 @@ impl Dispatcher {
             match TcpOutboundHandlerTrait::handle(tcp.as_ref(), self.ctx.clone(), sess).await {
                 Ok(res) => res,
                 Err(err) => {
-                    match &err {
-                        Error::ConnectError(name, port) => {
-                            debug!(
-                                "connect to proxy {}:{}. failed.err{}, connection {} -> {}",
-                                name, port, err, sess.local_peer, sess.destination
-                            );
-                        }
-                        _ => (),
-                    }
+                    debug!(
+                        "connect to proxy {}. failed.connection {} -> {}",
+                        sess.destination.to_string(), sess.local_peer, sess.destination
+                    );
                     return;
                 }
             };

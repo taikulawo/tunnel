@@ -19,6 +19,8 @@ use tokio::{
 use crate::{app::DnsClient, Context};
 
 mod tun;
+pub mod socks;
+pub mod direct;
 pub enum NetworkType {
     TCP,
     UDP,
@@ -28,7 +30,6 @@ pub struct TransportNetwork {
     pub addr: SocketAddr,
     pub net_type: NetworkType,
 }
-pub mod socks;
 
 pub struct DomainSession {
     name: String,
@@ -217,7 +218,7 @@ pub trait TcpOutboundHandlerTrait: Send + Sync + Unpin {
     // remote addr should be connected directly
     // no proxy involved
     // fn remote_addr(&self) -> OutboundConnect;
-    async fn handle(&self, ctx: Arc<Context>, sess: &Session) -> Result<TcpStream, Error>;
+    async fn handle(&self, ctx: Arc<Context>, sess: &Session) -> anyhow::Result<TcpStream>;
 }
 
 #[derive(Error, Debug)]
@@ -228,7 +229,7 @@ pub enum Error {
 
 #[async_trait]
 pub trait UdpOutboundHandlerTrait: Send + Sync + Unpin {
-    async fn handle(&self, ctx: Arc<Context>, sess: &Session) -> Result<UdpSocket, Error>;
+    async fn handle(&self, ctx: Arc<Context>, sess: &Session) -> anyhow::Result<UdpSocket>;
 }
 
 pub type AnyTcpOutboundHandler = Arc<dyn TcpOutboundHandlerTrait>;
