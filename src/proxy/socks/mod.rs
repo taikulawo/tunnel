@@ -16,6 +16,7 @@ use crate::proxy::{Address, Session};
 
 mod inbound;
 mod outbound;
+mod udp;
 
 pub use self::inbound::TcpInboundHandler;
 pub use self::inbound::UdpInboundHandler;
