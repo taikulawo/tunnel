@@ -21,7 +21,7 @@
             },
             "args": [
                 "--config",
-                "${workspaceFolder}/config.json"
+                "${workspaceFolder}/config.jsonc"
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"

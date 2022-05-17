@@ -9,7 +9,7 @@ use log::{warn, debug};
 
 use crate::{proxy::{Session, Address}, config::Rule};
 
-
+// https://v2ray.com/chapter_02/03_routing.html
 
 pub trait ConditionMatcher: Sync + Send + Unpin {
     fn apply(&self, sess: &Session) -> bool;

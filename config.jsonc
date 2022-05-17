@@ -42,7 +42,7 @@
             "listen":"127.0.0.1",
             "protocol": "socks",
             "settings": {},
-            "tag": "socks_out"
+            "tag": "socks_in"
         },
         {
             "protocol": "trojan",
@@ -66,24 +66,23 @@
         {
             "protocol": "direct",
             "tag": "direct_out"
-        },
-        {
-            "protocol":"shadowsocks",
-            "tag":"shadowsocks_out",
-            "settings": {
-                "method":"aes-gcm-128",
-                "password":"123456",
-                "address":"127.0.0.1",
-                "port": 6666
-            }
         }
+        // {
+        //     "protocol":"shadowsocks",
+        //     "tag":"shadowsocks_out",
+        //     "settings": {
+        //         "method":"aes-gcm-128",
+        //         "password":"123456",
+        //         "address":"127.0.0.1",
+        //         "port": 6666
+        //     }
+        // }
     ],
-    // route 按照数组顺序，自上而下进行
     "routes": [
         {
             "ip": [
-                "8.8.8.8",
-                "8.8.4.4"
+                "8.8.8.8/8",
+                "8.8.4.4/8"
             ],
             "target": "socks_out"
         },

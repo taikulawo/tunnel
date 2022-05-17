@@ -1,9 +1,11 @@
 use anyhow::Result;
+use json_comments::StripComments;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use std::{
     collections::HashMap,
     fs::{self, File},
+    io::{self, Read},
     net::SocketAddr,
 };
 
@@ -36,7 +38,7 @@ pub struct Socks5InboundSettings {}
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Socks5OutboundSettings {
     pub address: String,
-    pub port: u16
+    pub port: u16,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -57,8 +59,8 @@ pub struct ShadowsocksOutboundSettings {
 
 #[derive(Clone, Deserialize)]
 pub struct Inbound {
-    pub port: u16, 
-    pub listen: String,
+    pub port: Option<u16>,
+    pub listen: Option<String>,
     pub protocol: String,
     pub tag: String,
     // domain or socket addr
@@ -99,7 +101,10 @@ impl Default for Config {
 }
 
 pub fn parse_from_str(p: &str) -> Result<Config> {
-    let json = serde_json::from_str(p)?;
+    let mut str = StripComments::new(p.as_bytes());
+    let mut s = String::new();
+    str.read_to_string(&mut s);
+    let json = serde_json::from_str(s.as_str())?;
     Ok(json)
 }
 

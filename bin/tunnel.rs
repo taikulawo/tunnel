@@ -7,6 +7,7 @@ use log::error;
 use log4rs::{
     append::console::ConsoleAppender,
     config::{Appender, Logger, Root},
+    encode::{pattern::PatternEncoder, Encode},
 };
 use tokio::{runtime::Builder, sync::RwLock};
 use tunnel::{
@@ -23,7 +24,9 @@ fn load() -> Result<()> {
             .value_name("FILE"),
     );
 
-    let stdout_logger = ConsoleAppender::builder().build();
+    let stdout_logger = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new("{d} {h({l})} {f}:{L} {m} {n}")))
+        .build();
     let logger_config = log4rs::Config::builder()
         .appender(Appender::builder().build("stdout", Box::new(stdout_logger)))
         .logger(Logger::builder().build("tunnel", log::LevelFilter::Trace))
@@ -48,6 +51,7 @@ fn load() -> Result<()> {
         }
     };
     let mut tasks = Vec::new();
+
     let inbound_manager = InboundManager::new(config.inbounds.clone());
     let outbound_manager = Arc::new(OutboundManager::new(&config.outbounds)?);
     let router = Arc::new(Router::new(&config.routes));
@@ -61,7 +65,14 @@ fn load() -> Result<()> {
         outbound_manager,
         &config,
     ));
-    tasks.push(inbound_manager.listen(dispatcher.clone()));
+    let inbound_futures = match inbound_manager.listen(dispatcher.clone()) {
+        Ok(x) => x,
+        Err(err) => {
+            error!("{}", err);
+            return Err(err);
+        } 
+    };
+    tasks.push(inbound_futures);
 
     rt.block_on(future::join_all(tasks));
     Ok(())

@@ -7,7 +7,7 @@ use log::{error, info};
 
 use crate::{
     config::{Outbound, Socks5OutboundSettings},
-    proxy::{socks, OutboundHandler, Address},
+    proxy::{socks, OutboundHandler, Address, direct},
 };
 
 // 管理全部的传出协议 outbound
@@ -60,7 +60,9 @@ impl OutboundManager {
                     todo!()
                 }
                 "direct" => {
-                    todo!()
+                    let tcp = Arc::new(direct::TcpOutboundHandler{});
+                    let udp = Arc::new(direct::UdpOutboundHandler{});
+                    Arc::new(OutboundHandler::new(outbound.tag.clone(), Some(tcp), Some(udp)))
                 }
                 _ => {
                     info!("found unsupported outbound {}", outbound.tag);

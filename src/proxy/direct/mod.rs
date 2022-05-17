@@ -7,7 +7,7 @@ use crate::Context;
 
 use super::{TcpOutboundHandlerTrait, Session, Error, UdpOutboundHandlerTrait, connect_to_remote_tcp, connect_to_remote_udp};
 
-struct TcpOutboundHandler{}
+pub struct TcpOutboundHandler{}
 
 #[async_trait]
 impl TcpOutboundHandlerTrait for TcpOutboundHandler {
@@ -16,7 +16,7 @@ impl TcpOutboundHandlerTrait for TcpOutboundHandler {
     }
 }
 
-struct UdpOutboundHandler{}
+pub struct UdpOutboundHandler{}
 
 #[async_trait]
 impl UdpOutboundHandlerTrait for UdpOutboundHandler {

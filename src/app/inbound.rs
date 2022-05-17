@@ -28,14 +28,14 @@ impl InboundManager {
 
         // 迭代全部的inbound协议，并创建listener
         for inbound in config.iter() {
-            let handler = match &*inbound.tag {
+            let handler = match &*inbound.protocol {
                 "socks" => {
                     let tcp = Arc::new(TcpInboundHandler);
                     let udp = Arc::new(UdpInboundHandler);
                     InboundHandler::new(inbound.tag.clone(), Some(tcp), Some(udp))
                 }
                 _ => {
-                    info!("unknown tag {}", inbound.tag);
+                    info!("unknown protocol: {} tag: {}", inbound.protocol, inbound.tag);
                     continue;
                 }
             };
@@ -46,23 +46,31 @@ impl InboundManager {
             configs: config,
         }
     }
-    pub async fn listen(mut self, dispatcher: Arc<Dispatcher>) -> BoxFuture<'static, ()> {
+    pub fn listen(mut self, dispatcher: Arc<Dispatcher>) -> Result<BoxFuture<'static, ()>> {
         let mut tasks = Vec::new();
         for config in self.configs {
             let dispatcher = dispatcher.clone();
             if let Some(handler) = self.handlers.get_mut(&config.tag) {
-                let Inbound { port, listen, .. } = config;
-                let addr = match SocketAddr::from_str(format!("{}:{}", listen, port).as_str()) {
-                    Ok(x) => x,
-                    Err(err) => {
-                        error!("invalid listen or port field {}", err);
-                        continue;
+                let Inbound { port, listen, protocol, .. } = config;
+                // 除 tun 外，其他protocol都必须有port
+                let mut future = match protocol.as_str() {
+                    "tun" => {
+                        todo!()
+                    },
+                    _ => {
+                        let addr = match SocketAddr::from_str(format!("{}:{}", listen.unwrap(), port.unwrap()).as_str()) {
+                            Ok(x) => x,
+                            Err(err) => {
+                                error!("invalid listen or port field {}", err);
+                                continue;
+                            }
+                        };
+                        InboundListener::listen(dispatcher, handler.clone(), addr)?
                     }
                 };
-                let future = InboundListener::listen(dispatcher, handler.clone(), addr);
-                tasks.push(future);
+                tasks.append(&mut future);
             }
         }
-        futures::future::join_all(tasks).map(|x| ()).boxed()
+        Ok(futures::future::join_all(tasks).map(|x| ()).boxed())
     }
 }

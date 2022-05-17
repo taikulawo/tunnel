@@ -154,14 +154,10 @@ impl DnsClient {
                         }
                         return Ok(ips);
                     }
-                    Err(err) => {
-                        return Err(anyhow!("error when recv from {}", err))
-                    }
+                    Err(err) => return Err(anyhow!("error when recv from {}", err)),
                 }
             }
-            Err(err) => {
-                return Err(anyhow!("error when send to {}", err))
-            }
+            Err(err) => return Err(anyhow!("error when send to {}", err)),
         };
     }
 }

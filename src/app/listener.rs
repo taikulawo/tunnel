@@ -1,6 +1,6 @@
 use futures_util::{future::BoxFuture, stream::FuturesUnordered, FutureExt, StreamExt};
-use log::error;
-use std::{io::Result, net::SocketAddr, sync::Arc};
+use log::{error, info};
+use std::{io::Result, net::SocketAddr, sync::Arc, process::Output, future::Future};
 use tokio::{
     net::{TcpListener, UdpSocket},
     sync::futures,
@@ -17,9 +17,9 @@ use crate::{
 use super::dispatcher::Dispatcher;
 
 pub struct InboundListener {}
-type TaskFuture = BoxFuture<'static, Result<()>>;
+type TaskFuture = BoxFuture<'static, ()>;
 impl InboundListener {
-    pub async fn listen(
+    pub fn listen(
         dispatcher: Arc<Dispatcher>,
         handler: AnyInboundHandler,
         addr: SocketAddr,
@@ -36,23 +36,24 @@ impl InboundListener {
             // 这就要求 tcp_listener 改为 InboundListener
             // 实在不想在 listen 糅合一堆代码，我在这里采用 2
             let f =
-                InboundListener::tcp_listener(handler.clone(), dispatcher.clone(), addr).boxed();
+                InboundListener::tcp_listener(handler.clone(), dispatcher.clone(), addr);
             tasks.push(f);
         }
         if (handler.has_udp()) {
             let f =
-                InboundListener::udp_listener(handler.clone(), dispatcher.clone(), addr).boxed();
+                InboundListener::udp_listener(handler.clone(), dispatcher.clone(), addr);
             tasks.push(f);
         }
         Ok(tasks)
     }
-    async fn tcp_listener(
+    fn tcp_listener(
         handler: AnyInboundHandler,
         dispatcher: Arc<Dispatcher>,
         addr: SocketAddr,
-    ) -> Result<()> {
-        let listener = TcpListener::bind(addr).await?;
-        tokio::spawn(async move {
+    ) -> TaskFuture {
+        let task = async move {
+            let listener = TcpListener::bind(addr).await.unwrap();
+            info!("Tcp listening at {}", addr);
             for (conn, ..) in listener.accept().await {
                 let dispatcher = Arc::clone(&dispatcher);
                 let addr = conn.peer_addr().expect("peer");
@@ -74,16 +75,20 @@ impl InboundListener {
                     }
                 }
             }
-        });
-        Ok(())
+        }.boxed();
+        task
     }
-    async fn udp_listener(
+    fn udp_listener(
         handler: AnyInboundHandler,
         dispatcher: Arc<Dispatcher>,
         addr: SocketAddr,
-    ) -> Result<()> {
-        let listener = UdpSocket::bind(addr).await?;
+    ) -> TaskFuture {
+        let future = async move {
+            let listener = UdpSocket::bind(addr).await.unwrap();
+            info!("Udp listen at {}", addr);
+            ()
+        }.boxed();
         // todo!("udp listener")
-        Ok(())
+        future
     }
 }
