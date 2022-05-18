@@ -12,7 +12,7 @@ use log4rs::{
 use tokio::{runtime::Builder, sync::RwLock};
 use tunnel::{
     app::{Dispatcher, DnsClient, InboundManager, OutboundManager, Router},
-    Context,
+    Context, start_instance,
 };
 
 fn load() -> Result<()> {
@@ -23,22 +23,6 @@ fn load() -> Result<()> {
             .required(true)
             .value_name("FILE"),
     );
-
-    let stdout_logger = ConsoleAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{d} {h({l})} {f}:{L} {m} {n}")))
-        .build();
-    let logger_config = log4rs::Config::builder()
-        .appender(Appender::builder().build("stdout", Box::new(stdout_logger)))
-        .logger(Logger::builder().build("tunnel", log::LevelFilter::Trace))
-        .build(
-            Root::builder()
-                .appender("stdout")
-                .build(log::LevelFilter::Warn),
-        )
-        .unwrap();
-    let handler = log4rs::init_config(logger_config).unwrap();
-    let rt = Builder::new_multi_thread().enable_all().build().unwrap();
-
     let matchers = app.get_matches();
     let config_path = matchers
         .value_of("config")
@@ -50,31 +34,15 @@ fn load() -> Result<()> {
             return Err(err);
         }
     };
-    let mut tasks = Vec::new();
-
-    let inbound_manager = InboundManager::new(config.inbounds.clone());
-    let outbound_manager = Arc::new(OutboundManager::new(&config.outbounds)?);
-    let router = Arc::new(Router::new(&config.routes));
-    let dns_client = Arc::new(RwLock::new(DnsClient::new(config.clone())));
-
-    let context = Arc::new(Context::new(dns_client.clone()));
-    let dispatcher = Arc::new(Dispatcher::new(
-        context,
-        router,
-        dns_client.clone(),
-        outbound_manager,
-        &config,
-    ));
-    let inbound_futures = match inbound_manager.listen(dispatcher.clone()) {
-        Ok(x) => x,
-        Err(err) => {
-            error!("{}", err);
-            return Err(err);
-        } 
-    };
-    tasks.push(inbound_futures);
-
-    rt.block_on(future::join_all(tasks));
+    let tasks = start_instance(config).unwrap();
+    let (abort_future, handler) = futures::future::abortable(futures::future::join_all(tasks));
+    let rt = Builder::new_multi_thread().enable_all().build().unwrap();
+    rt.spawn(async move {
+        tokio::signal::ctrl_c().await.unwrap();
+        println!("ctrl c received");
+        handler.abort();
+    });
+    rt.block_on(abort_future);
     Ok(())
 }
 fn main() {
