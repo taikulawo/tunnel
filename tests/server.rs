@@ -2,13 +2,16 @@
 // 所以 local-proxy inbound 只需要socks就行，
 // 其他协议的 inbound，通过 local-proxy#outbound => remote-proxy-server#inbound 测试
 
-use std::{net::{SocketAddr, Ipv4Addr, ToSocketAddrs}, str::FromStr};
+use std::{
+    net::{Ipv4Addr, SocketAddr, ToSocketAddrs},
+    str::FromStr,
+};
 
-use futures::{FutureExt, future::BoxFuture};
-use tokio::{net::{
-    TcpListener,
-    UdpSocket
-}, runtime::Builder};
+use futures::{future::BoxFuture, FutureExt};
+use tokio::{
+    net::{TcpListener, UdpSocket},
+    runtime::Builder,
+};
 use tunnel::start_instance;
 pub async fn tcp_echo_server(addr: SocketAddr) {
     let listener = TcpListener::bind(addr).await.unwrap();
@@ -16,7 +19,7 @@ pub async fn tcp_echo_server(addr: SocketAddr) {
         match listener.accept().await {
             Ok((stream, _)) => {
                 tokio::spawn(async {
-                    let (mut read_half,mut write_half) = stream.into_split();
+                    let (mut read_half, mut write_half) = stream.into_split();
                     tokio::io::copy(&mut read_half, &mut write_half).await
                 });
             }
@@ -46,7 +49,7 @@ pub async fn udp_echo_server(bind_addr: SocketAddr) {
     }
 }
 
-pub fn run_two_of_echo_server(bind_addr: SocketAddr) -> Vec<BoxFuture<'static, ()>>{
+pub fn run_two_of_echo_server(bind_addr: SocketAddr) -> Vec<BoxFuture<'static, ()>> {
     let mut tasks = Vec::new();
     let f = tcp_echo_server(bind_addr.clone()).boxed();
     tasks.push(f);
@@ -54,18 +57,17 @@ pub fn run_two_of_echo_server(bind_addr: SocketAddr) -> Vec<BoxFuture<'static, (
     tasks.push(f);
     tasks
 }
-pub async fn start_tunnel(config: tunnel::Config) {
+pub async fn start_tunnel(config: tunnel::Config, echo_server_listening_at: String) {
     let rt = Builder::new_current_thread().enable_all().build().unwrap();
     let mut tasks = start_instance(config).unwrap();
-    
-    // echo server is the real remote server we want to connected.
-    let mut echo_futures = run_two_of_echo_server(SocketAddr::from_str("127.0.0.1:6666").unwrap());
+
+    // echo server is the real remote server that we want to connected.
+    let mut echo_futures =
+        run_two_of_echo_server(SocketAddr::from_str(&echo_server_listening_at.as_str()).unwrap());
     tasks.append(&mut echo_futures);
-    
-    // tasks.extend_from_slice();
-    let (abort_future, abort_handler) = futures::future::abortable(futures::future::join_all(tasks));
+    let (abort_future, abort_handler) =
+        futures::future::abortable(futures::future::join_all(tasks));
     let test_future = async {
-        
         // call abort handler after test completed
         abort_handler.abort();
     };

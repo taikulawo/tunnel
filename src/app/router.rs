@@ -39,6 +39,7 @@ macro_rules! try_rule {
         match $matcher {
             Ok(x) => x,
             Err(err) => {
+                warn!("{}", err);
                 continue;
             }
         }
@@ -108,8 +109,7 @@ impl IpCidrMatcher {
             let cidr = match ip.parse::<IpNet>() {
                 Ok(x) => x,
                 Err(err) => {
-                    warn!("invalid cidr {} {}",ip , err);
-                    return Err(anyhow!(err))
+                    return Err(anyhow!("invalid cidr {} {}", ip, err))
                 }
             };
             ips.push(cidr);
