@@ -1,6 +1,6 @@
 mod server;
 #[test]
-fn test() {
+fn start() {
     let local = r#"
     {
         "general":{
@@ -41,8 +41,8 @@ fn test() {
             {
                 "protocol": "socks",
                 "settings": {
-                    "address": "192.168.3.2",
-                    "port": 7890
+                    "address": "127.0.0.1",
+                    "port": 1081
                 },
                 "tag": "socks_out"
             }
@@ -99,7 +99,7 @@ fn test() {
         },
         "inbounds": [
             {
-                "port": 7890,
+                "port": 1081,
                 "listen": "127.0.0.1",
                 "protocol": "socks",
                 "settings": {},

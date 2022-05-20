@@ -7,6 +7,19 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Cargo test socks",
+            "cargo": {
+                "args": [
+                    "test",
+                    "socks5"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": []
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug executable 'tunnel'",
             "cargo": {
                 "args": [

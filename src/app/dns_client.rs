@@ -6,7 +6,7 @@ use futures_util::{
 use log::trace;
 use rand::{Rng, SeedableRng};
 use std::{
-    net::{IpAddr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4},
     str::FromStr,
     vec,
 };
@@ -14,7 +14,7 @@ use std::{
 use trust_dns_proto::{
     op::{Message, MessageType, OpCode, Query, ResponseCode},
     rr::{Name, RData, RecordType},
-    serialize::binary::BinDecodable,
+    serialize::binary::{BinDecodable, BinEncodable},
 };
 
 use crate::{
@@ -43,12 +43,12 @@ impl DnsClient {
         if let Some(dns) = &config.dns {
             if let Some(server) = &dns.servers {
                 let mut ss = Vec::new();
-                for str  in server {
+                for str in server {
                     let addr = match str.parse::<SocketAddr>() {
                         Ok(x) => x,
                         Err(err) => {
                             log::warn!("{} ip:{}", err, str);
-                            continue
+                            continue;
                         }
                     };
                     ss.push(addr);
@@ -62,7 +62,7 @@ impl DnsClient {
             config: config,
         }
     }
-    pub fn new_query(&self, host: &String, ty: RecordType) -> Message {
+    pub fn new_query(host: &String, ty: RecordType) -> Message {
         let mut message = Message::new();
         let mut query = Query::new();
         let name = Name::from_str(&*host).expect("wrong host!");
@@ -88,7 +88,7 @@ impl DnsClient {
         match (use_ipv6, prefer_ipv6) {
             (true, true) => {
                 // only wait ipv6 result
-                let query = self.new_query(host, RecordType::AAAA);
+                let query = DnsClient::new_query(host, RecordType::AAAA);
                 let server = random_get!(self.remote_dns_servers);
                 let v = query.to_vec()?;
                 let task = DnsClient::do_lookup(v, &*host, server).boxed();
@@ -97,11 +97,11 @@ impl DnsClient {
             (true, false) => {
                 // wait the first result
                 let server = random_get!(self.remote_dns_servers);
-                let query = self.new_query(&host, RecordType::A);
+                let query = DnsClient::new_query(&host, RecordType::A);
                 let v = query.to_vec()?;
                 let task = DnsClient::do_lookup(v, &*host, server).boxed();
                 tasks.push(task);
-                let query = self.new_query(&host, RecordType::AAAA);
+                let query = DnsClient::new_query(&host, RecordType::AAAA);
                 let v = query.to_vec()?;
                 let task = DnsClient::do_lookup(v, &*host, server).boxed();
                 tasks.push(task);
@@ -110,7 +110,7 @@ impl DnsClient {
                 // don't use ipv6
                 // just use ipv4
                 let server = random_get!(self.remote_dns_servers);
-                let query = self.new_query(&host, RecordType::A);
+                let query = DnsClient::new_query(&host, RecordType::A);
                 let v = query.to_vec()?;
                 let task = DnsClient::do_lookup(v, &*host, server).boxed();
                 tasks.push(task);
@@ -135,11 +135,13 @@ impl DnsClient {
         trace!("look up {} on {}", host, &server);
         let socket = match server {
             SocketAddr::V4(_v4) => {
-                let bind_addr = get_default_ipv4_gateway()?;
+                // let bind_addr = get_default_ipv4_gateway()?;
+                let bind_addr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
                 create_bounded_udp_socket(bind_addr)?
             }
             SocketAddr::V6(_v6) => {
-                let bind_addr = get_default_ipv6_gateway()?;
+                // let bind_addr = get_default_ipv6_gateway()?;
+                let bind_addr = IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0));
                 create_bounded_udp_socket(bind_addr)?
             }
         };
@@ -173,4 +175,36 @@ impl DnsClient {
             Err(err) => return Err(anyhow!("error when send to {}", err)),
         };
     }
+}
+
+#[tokio::test]
+async fn lookup_test() {
+    use tokio::net::UdpSocket;
+
+    let host = "www.baidu.com".to_string();
+    let query = DnsClient::new_query(&host, RecordType::A);
+    let socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
+    let target = "114.114.114.114:53".parse::<SocketAddr>().unwrap();
+    socket
+        .send_to(&*query.to_bytes().unwrap(), target)
+        .await
+        .unwrap();
+    let mut buf = [0; 512];
+    let (n, _) = socket.recv_from(&mut buf).await.unwrap();
+    let message = Message::from_bytes(&buf[..n]).unwrap();
+    let answers = message.answers();
+    let mut ips = Vec::new();
+    for answer in answers {
+        let rdata = answer.rdata();
+        match rdata {
+            RData::A(v4) => {
+                ips.push(v4.to_string());
+            }
+            RData::AAAA(v6) => {
+                ips.push(v6.to_string());
+            }
+            _ => {}
+        }
+    }
+    println!("{:?}", ips);
 }

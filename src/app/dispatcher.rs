@@ -76,10 +76,10 @@ impl Dispatcher {
         let mut remote_stream =
             match TcpOutboundHandlerTrait::handle(tcp.as_ref(), self.ctx.clone(), sess).await {
                 Ok(res) => res,
-                Err(_err) => {
+                Err(err) => {
                     debug!(
-                        "connect to proxy {}. failed.connection {} -> {}",
-                        sess.destination.to_string(), sess.local_peer, sess.destination
+                        "connect to {} failed. connection {} -> {} {}",
+                        sess.destination.to_string(), sess.local_peer, sess.destination, err
                     );
                     return;
                 }
