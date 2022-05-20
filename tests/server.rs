@@ -60,7 +60,7 @@ pub fn run_two_of_echo_server(bind_addr: SocketAddr) -> Vec<BoxFuture<'static, (
 }
 
 // should be called on the tokio runtime context
-pub async fn start_tunnel(
+pub fn start_tunnel(
     configs: Vec<tunnel::config::Config>,
     echo_server_listening_at: &str,
     socks_server_listening_at: &str,

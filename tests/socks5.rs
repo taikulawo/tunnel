@@ -1,6 +1,6 @@
 mod server;
-#[tokio::test]
-async fn test() {
+#[test]
+fn test() {
     let local = r#"
     {
         "general":{
@@ -126,5 +126,5 @@ async fn test() {
         let c = serde_json::from_str(config).unwrap();
         configs.push(c);
     }
-    server::start_tunnel(configs, "127.0.0.1:3002","127.0.0.1:1080").await;
+    server::start_tunnel(configs, "127.0.0.1:3002","127.0.0.1:1080");
 }
