@@ -70,13 +70,12 @@ impl TryFrom<(String, u16)> for Address {
     type Error = io::Error;
     fn try_from(value: (String, u16)) -> Result<Self, Self::Error> {
         let str = value.0;
+        let port = value.1;
         let address = match str.parse::<SocketAddr>(){
             Ok(res) => Self::Ip(res),
             Err(_err) => {
                 // maybe a domain name
                 // if it's a bad domain:port, exception will raise when connect to it
-                let parts: Vec<&str> = str.split(':').collect();
-                let port = u16::from_str_radix(*parts.get(0).unwrap_or(&"0"), 10).unwrap();
                 Self::Domain(str.to_string(), port)
             }
         };
@@ -292,7 +291,7 @@ pub async fn connect_to_remote_tcp(dns_client:Arc<RwLock<DnsClient>>, addr: Addr
 pub async fn name_to_socket_addr(dns_client: Arc<RwLock<DnsClient>>, addr: Address) -> anyhow::Result<SocketAddr> {
     let socket_addr = match addr {
         Address::Domain(name, port) => {
-            match dns_client.read().await.lookup(&format!("{}:{}", name, port)).await {
+            match dns_client.read().await.lookup(&name).await {
                 Ok(ips) => {
                     // TODO connect to multiple ips
                     let ip = if let Some(ip) = ips.get(0) {
