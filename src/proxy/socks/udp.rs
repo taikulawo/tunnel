@@ -1,4 +1,4 @@
-use std::{io, net::{IpAddr, Ipv4Addr}};
+use std::{net::{Ipv4Addr}};
 
 use log::error;
 use tokio::io::{AsyncRead, AsyncReadExt};
@@ -6,7 +6,7 @@ use anyhow::{
     anyhow
 };
 
-type Reader = AsyncRead + Unpin;
+type Reader = dyn AsyncRead + Unpin;
 
 pub async fn handshake(stream: &mut Reader)
 {
@@ -40,7 +40,7 @@ pub async fn Socks5AddrReader(reader: &mut Reader) -> anyhow::Result<()> {
         ATYP_IPV4 => {
             buf.resize(4, 0);
             reader.read_exact(&mut buf).await?;
-            let v4 = Ipv4Addr::new(buf[0], buf[1], buf[2], buf[3]);
+            let _v4 = Ipv4Addr::new(buf[0], buf[1], buf[2], buf[3]);
         }
         ATYP_DOMAIN => {
 

@@ -2,8 +2,6 @@ use log::error;
 use std::io;
 
 use crate::{
-    config::Socks5InboundSettings,
-    net::ProxyStream,
     proxy::{
         socks::handshake_as_server, Session, InboundResult, TcpInboundHandlerTrait,
         UdpInboundHandlerTrait,
@@ -16,7 +14,7 @@ pub struct TcpInboundHandler;
 
 #[async_trait]
 impl TcpInboundHandlerTrait for TcpInboundHandler {
-    async fn handle(&self, conn: Session, mut stream: TcpStream) -> io::Result<InboundResult> {
+    async fn handle(&self, _conn: Session, mut stream: TcpStream) -> io::Result<InboundResult> {
         let session = match handshake_as_server(&mut stream).await {
             Ok(session) => session,
             Err(err) => {

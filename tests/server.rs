@@ -3,7 +3,7 @@
 // 其他协议的 inbound，通过 local-proxy#outbound => remote-proxy-server#inbound 测试
 
 use std::{
-    net::{Ipv4Addr, SocketAddr, ToSocketAddrs},
+    net::{SocketAddr},
     str::FromStr,
 };
 

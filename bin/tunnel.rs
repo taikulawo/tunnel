@@ -1,21 +1,13 @@
-use std::{error::Error, io, sync::Arc};
 
-use anyhow::{anyhow, Result};
+
+use anyhow::{Result};
 use clap::Arg;
-use futures::{future, FutureExt};
+use futures::{FutureExt};
 use log::error;
-use log4rs::{
-    append::console::ConsoleAppender,
-    config::{Appender, Logger, Root},
-    encode::{pattern::PatternEncoder, Encode},
-};
-use tokio::{
-    runtime::Builder,
-    sync::{mpsc, RwLock},
-};
+
+
 use tunnel::{
-    app::{Dispatcher, DnsClient, InboundManager, OutboundManager, Router},
-    newRuntime, Context, start,
+    start,
 };
 
 fn load() -> Result<()> {

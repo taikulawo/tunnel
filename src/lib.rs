@@ -4,11 +4,11 @@ mod config;
 mod net;
 mod proxy;
 
-use std::{sync::Arc, mem, cell::Cell};
+use std::{sync::Arc};
 
 use app::{Dispatcher, DnsClient, InboundManager, OutboundManager, Router};
 use futures::future::BoxFuture;
-use log::error;
+
 use log4rs::{
     append::console::ConsoleAppender,
     config::{Appender, Logger, Root},
@@ -17,7 +17,7 @@ use log4rs::{
 use anyhow::{
     anyhow
 };
-use tokio::{runtime::{Builder, Runtime}, sync::{RwLock, mpsc::{self, Sender, Receiver}}};
+use tokio::{sync::{RwLock}};
 
 pub use self::config::{load_from_file, parse_from_str, Config};
 
@@ -53,7 +53,7 @@ pub fn start(config: config::Config, shutdown_handler: BoxFuture<'static, ()>) -
         )
         .unwrap();
         
-        let handler = log4rs::init_config(logger_config).unwrap();
+        let _handler = log4rs::init_config(logger_config).unwrap();
         
         let inbound_manager = InboundManager::new(config.inbounds.clone());
         let outbound_manager = Arc::new(OutboundManager::new(config.outbounds.clone())?);

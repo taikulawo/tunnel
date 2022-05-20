@@ -1,18 +1,18 @@
 use pin_project::pin_project;
-use socket2::Socket;
+
 use std::pin::Pin;
 use std::task::Poll;
-use std::{io, net::SocketAddr, os::unix::prelude::AsRawFd, task::Context};
+use std::{io, net::SocketAddr, task::Context};
 use tokio::io::{AsyncWrite, ReadBuf};
 use tokio::{
     io::AsyncRead,
-    net::{TcpSocket, TcpStream},
+    net::{TcpStream},
 };
 
-use crate::common::get_default_interface;
+
 use crate::proxy::{create_bounded_tcp_socket};
 
-use super::sys::bind_to_device;
+
 #[pin_project]
 pub struct ProxyStream {
     #[pin]

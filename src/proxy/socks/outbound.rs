@@ -1,12 +1,12 @@
-use std::{io, net::SocketAddr, sync::Arc};
+use std::{sync::Arc};
 
 use async_trait::async_trait;
 use log::debug;
-use tokio::{io::AsyncWriteExt, net::{TcpStream, UdpSocket}};
+use tokio::{net::{TcpStream, UdpSocket}};
 
 use crate::{
     proxy::{
-        connect_to_remote_tcp, Address, Error, OutboundConnect, Session, TcpOutboundHandlerTrait,
+        connect_to_remote_tcp, Address, Session, TcpOutboundHandlerTrait,
         UdpOutboundHandlerTrait,
     },
     Context,
@@ -39,7 +39,7 @@ pub struct UdpOutboundHandler {
 
 #[async_trait]
 impl UdpOutboundHandlerTrait for UdpOutboundHandler {
-    async fn handle(&self, ctx: Arc<Context>, session: &Session) -> anyhow::Result<UdpSocket> {
+    async fn handle(&self, _ctx: Arc<Context>, _session: &Session) -> anyhow::Result<UdpSocket> {
         todo!()
     }
 }

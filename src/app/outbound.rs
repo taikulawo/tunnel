@@ -1,6 +1,5 @@
 use std::{collections::HashMap, sync::Arc, convert::TryFrom};
 use anyhow::{
-    anyhow,
     Result
 };
 use log::{error, info};
@@ -38,7 +37,7 @@ impl OutboundManager {
                     let socks_port = socks_settings.port;
                     let addr = match Address::try_from((socks_addr.clone(), socks_port)) {
                         Ok(r) => r,
-                        Err(err) => {
+                        Err(_err) => {
                             error!("bad socks addr found {}:{}", socks_addr, socks_port);
                             continue
                         }

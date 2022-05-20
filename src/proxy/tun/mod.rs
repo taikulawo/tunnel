@@ -1,12 +1,12 @@
 use etherparse::{
-    IpHeader, Ipv4Header, PacketBuilder, PacketHeaders, ReadError, TcpHeader, TransportHeader,
+    IpHeader, PacketHeaders, ReadError, TransportHeader,
 };
 use ipnet::Ipv4Net;
 use log::error;
 use std::{
     error::Error,
     io::{self, Cursor, ErrorKind},
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tun::{AsyncDevice, Device, Layer};
@@ -136,7 +136,7 @@ impl Tun {
                     .write(&mut cursor)
                     .expect("tcp header write failed!");
             }
-            Some(TransportHeader::Udp(ref mut udp_header)) => {}
+            Some(TransportHeader::Udp(ref mut _udp_header)) => {}
             None => {}
         };
         Ok(true)

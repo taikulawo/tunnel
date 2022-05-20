@@ -1,8 +1,7 @@
 use core::fmt;
 use std::{
     io,
-    net::{IpAddr, SocketAddr},
-    os::unix::prelude::{FromRawFd, IntoRawFd}, sync::Arc, convert::TryFrom, fmt::Display, ops::Add,
+    net::{IpAddr, SocketAddr}, sync::Arc, convert::TryFrom, fmt::Display,
 };
 
 use anyhow::{
@@ -89,7 +88,7 @@ impl From<String> for Address {
     fn from(s: String) -> Self {
         let address = match s.parse::<SocketAddr>(){
             Ok(res) => Self::Ip(res),
-            Err(err) => {
+            Err(_err) => {
                 // maybe a domain name
                 // if it's a bad domain:port, exception will raise when connect to it
                 let parts: Vec<&str> = s.split(':').collect();
@@ -191,13 +190,13 @@ impl InboundHandlerTrait for InboundHandler {
 
 #[async_trait]
 impl TcpInboundHandlerTrait for InboundHandler {
-    async fn handle(&self, sess: Session, stream: TcpStream) -> io::Result<InboundResult> {
+    async fn handle(&self, _sess: Session, _stream: TcpStream) -> io::Result<InboundResult> {
         todo!()
     }
 }
 #[async_trait]
 impl UdpInboundHandlerTrait for InboundHandler {
-    async fn handle(&self, sess: Session, socket: UdpSocket) -> io::Result<InboundResult> {
+    async fn handle(&self, _sess: Session, _socket: UdpSocket) -> io::Result<InboundResult> {
         todo!()
     }
 }

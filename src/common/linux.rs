@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
-use log::error;
+
 use std::{
-    io::{self, BufRead, ErrorKind},
+    io::{self, BufRead},
     net::IpAddr,
     process::Command,
     str::FromStr,

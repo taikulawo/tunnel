@@ -4,17 +4,13 @@ use futures_util::{
     FutureExt,
 };
 use log::trace;
-use rand::{random, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
 use std::{
-    future::Future,
-    io,
     net::{IpAddr, SocketAddr},
-    process::Output,
     str::FromStr,
-    sync::Arc,
     vec,
 };
-use tokio::net::UdpSocket;
+
 use trust_dns_proto::{
     op::{Message, MessageType, OpCode, Query, ResponseCode},
     rr::{Name, RData, RecordType},
@@ -22,7 +18,7 @@ use trust_dns_proto::{
 };
 
 use crate::{
-    common::{get_default_interface, get_default_ipv4_gateway, get_default_ipv6_gateway},
+    common::{get_default_ipv4_gateway, get_default_ipv6_gateway},
     config::{Config, GeneralSettings},
     proxy::create_bounded_udp_socket,
 };
@@ -43,7 +39,7 @@ pub struct DnsClient {
 
 impl DnsClient {
     pub fn new(config: Config) -> DnsClient {
-        let dns = config.dns;
+        let _dns = config.dns;
         DnsClient {
             remote_dns_servers: Vec::new(),
             config: Default::default(),
@@ -121,11 +117,11 @@ impl DnsClient {
     ) -> Result<Vec<IpAddr>> {
         trace!("look up {} on {}", host, &server);
         let socket = match server {
-            SocketAddr::V4(v4) => {
+            SocketAddr::V4(_v4) => {
                 let bind_addr = get_default_ipv4_gateway()?;
                 create_bounded_udp_socket(bind_addr)?
             }
-            SocketAddr::V6(v6) => {
+            SocketAddr::V6(_v6) => {
                 let bind_addr = get_default_ipv6_gateway()?;
                 create_bounded_udp_socket(bind_addr)?
             }

@@ -1,11 +1,11 @@
-use std::{io, sync::Arc};
+use std::{sync::Arc};
 
 use async_trait::async_trait;
 use tokio::net::{TcpStream, UdpSocket};
 
 use crate::Context;
 
-use super::{TcpOutboundHandlerTrait, Session, Error, UdpOutboundHandlerTrait, connect_to_remote_tcp, connect_to_remote_udp};
+use super::{TcpOutboundHandlerTrait, Session, UdpOutboundHandlerTrait, connect_to_remote_tcp, connect_to_remote_udp};
 
 pub struct TcpOutboundHandler{}
 

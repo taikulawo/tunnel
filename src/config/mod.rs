@@ -4,8 +4,8 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use std::{
     collections::HashMap,
-    fs::{self, File},
-    io::{self, Read},
+    fs::{self},
+    io::{Read},
     net::SocketAddr,
 };
 

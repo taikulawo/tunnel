@@ -1,16 +1,15 @@
-use std::{collections::HashMap, convert::TryFrom, io, net::SocketAddr, sync::Arc};
+use std::{convert::TryFrom, sync::Arc};
 
-use anyhow::{anyhow, Result};
+
 use log::{debug, error};
 use tokio::{
-    io::AsyncReadExt,
     net::{TcpStream, UdpSocket},
     sync::RwLock,
 };
 
 use crate::{
     proxy::{
-        socks::TcpOutboundHandler, Address, Error, OutboundConnect, OutboundHandler, Session,
+        Address, Session,
         StreamWrapperTrait, TcpOutboundHandlerTrait,
     },
     Config, Context,
@@ -48,7 +47,7 @@ impl Dispatcher {
                     }
                     Box::new(sniffer)
                 }
-                Err(err) => return,
+                Err(_err) => return,
             }
         } else {
             Box::new(stream)
@@ -77,7 +76,7 @@ impl Dispatcher {
         let mut remote_stream =
             match TcpOutboundHandlerTrait::handle(tcp.as_ref(), self.ctx.clone(), sess).await {
                 Ok(res) => res,
-                Err(err) => {
+                Err(_err) => {
                     debug!(
                         "connect to proxy {}. failed.connection {} -> {}",
                         sess.destination.to_string(), sess.local_peer, sess.destination
@@ -89,14 +88,14 @@ impl Dispatcher {
         tokio::io::copy_bidirectional(&mut local_stream, &mut remote_stream).await;
     }
 
-    pub async fn dispatch_udp(&self, socket: UdpSocket, sess: Session) {}
+    pub async fn dispatch_udp(&self, _socket: UdpSocket, _sess: Session) {}
 
     pub fn new(
         context: Arc<Context>,
         router: Arc<Router>,
         dns_client: Arc<RwLock<DnsClient>>,
         outbound_manager: Arc<OutboundManager>,
-        config: Config,
+        _config: Config,
     ) -> Dispatcher {
         Dispatcher {
             ctx: context,

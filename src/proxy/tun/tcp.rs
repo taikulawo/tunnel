@@ -6,10 +6,10 @@ use std::{
 };
 
 use etherparse::TcpHeader;
-use ipnet::{IpNet, Ipv4Net};
+use ipnet::{IpNet};
 use log::error;
 use lru_time_cache::LruCache;
-use tokio::{io::AsyncWriteExt, net::TcpStream, sync::Mutex};
+use tokio::{net::TcpStream, sync::Mutex};
 
 use crate::net::{ProxyStream, ProxyTcpListener};
 
@@ -162,7 +162,7 @@ impl TcpTun {
     async fn tunnel(listener: ProxyTcpListener, translator: Arc<Mutex<Nat>>) {
         loop {
             // remote_addr is fake ip
-            let (mut stream, remote_addr) = match listener.accept().await {
+            let (stream, remote_addr) = match listener.accept().await {
                 Ok(x) => x,
                 Err(err) => {
                     error!("accept error at {}", &err);
@@ -184,10 +184,10 @@ impl TcpTun {
     }
     // REDIRECT
     // transparent proxy
-    async fn handle_redir(mut stream: TcpStream, src_addr: SocketAddr, dest_addr: SocketAddr) {
+    async fn handle_redir(_stream: TcpStream, _src_addr: SocketAddr, dest_addr: SocketAddr) {
         // stream is local stream
         //
-        let stream = match ProxyStream::connect(dest_addr).await {
+        let _stream = match ProxyStream::connect(dest_addr).await {
             Ok(s) => s,
             Err(err) => {
                 error!("connect to {} failed because of {}", dest_addr, err);

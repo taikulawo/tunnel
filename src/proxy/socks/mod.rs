@@ -1,16 +1,15 @@
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    ops::Add,
     str::FromStr,
 };
 
 use anyhow::{anyhow, bail, Result};
-use ipnet::IpAdd;
+
 use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
-use trust_dns_proto::rr::rdata::name;
+
 
 use crate::proxy::{Address, Session};
 

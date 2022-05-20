@@ -29,15 +29,14 @@ use std::{
 };
 
 use byteorder::{BigEndian, ByteOrder};
-use libc::truncate;
+
 use log::debug;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, ReadBuf},
-    net::TcpStream,
     time::timeout,
 };
 
-use crate::proxy::StreamWrapperTrait;
+
 
 // --------------------------------------------------------------|
 // | 0x00, 0x03 | 0x00, 0x00, 0x00| 0x01, 0x01, 0x01, 0x01, 0x01 |
@@ -105,10 +104,10 @@ where
 
         let mut buf = vec![0u8; 2048];
         let wait = Duration::from_millis(500);
-        for i in 1..3 {
+        for _i in 1..3 {
             match timeout(wait, self.stream.read(&mut buf)).await? {
                 // https://www.rfc-editor.org/rfc/rfc4346#page-17
-                Ok(n) => {
+                Ok(_n) => {
                     // 需要存储全部TLS record数据
                     // 当连接server时发过去
                     self.buf.extend_from_slice(&*buf);
@@ -258,7 +257,7 @@ async fn test_server_name() {
         value: &'a [u8]
     }
     impl AsyncRead for FakeStream<'_> {
-        fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+        fn poll_read(mut self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
             let remaining = min(buf.remaining(), self.value.len());
             buf.put_slice(&self.value[..remaining]);
             self.value = &self.value[remaining..];
@@ -266,13 +265,13 @@ async fn test_server_name() {
         }
     }
     impl AsyncWrite for FakeStream<'_> {
-        fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
+        fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, _buf: &[u8]) -> Poll<Result<usize, io::Error>> {
             unimplemented!()
         }
-        fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
             unimplemented!()
         }
-        fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
             unimplemented!()
         }
     }
@@ -283,7 +282,7 @@ async fn test_server_name() {
     let res = match sniffer.sniff().await {
         Ok(res) => res.unwrap(),
         Err(err) => {
-            panic!(err);
+            std::panic::panic_any(err);
         }
     };
     assert!("c.msn.cn" == res.as_str());

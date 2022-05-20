@@ -7,12 +7,10 @@ use std::sync::Arc;
 use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
-    config::{Inbound, Socks5InboundSettings},
+    config::{Inbound},
     proxy::{
-        socks::{TcpInboundHandler, UdpInboundHandler},
-        AnyInboundHandler, InboundHandler, InboundHandlerTrait,
+        socks::{TcpInboundHandler, UdpInboundHandler}, InboundHandler,
     },
-    Config,
 };
 
 use super::{Dispatcher, InboundListener};
@@ -71,6 +69,6 @@ impl InboundManager {
                 tasks.append(&mut future);
             }
         }
-        Ok(futures::future::join_all(tasks).map(|x| ()).boxed())
+        Ok(futures::future::join_all(tasks).map(|_x| ()).boxed())
     }
 }

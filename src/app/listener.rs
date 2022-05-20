@@ -1,16 +1,14 @@
-use futures_util::{future::BoxFuture, stream::FuturesUnordered, FutureExt, StreamExt};
+use futures_util::{future::BoxFuture, FutureExt, StreamExt};
 use log::{error, info};
-use std::{io::Result, net::SocketAddr, sync::Arc, process::Output, future::Future};
+use std::{io::Result, net::SocketAddr, sync::Arc};
 use tokio::{
     net::{TcpListener, UdpSocket},
-    sync::futures,
 };
 
 use crate::{
-    config,
     proxy::{
-        Address, AnyInboundHandler, InboundHandler, InboundResult, Network, NetworkType, Session,
-        TcpInboundHandlerTrait, TransportNetwork,
+        Address, AnyInboundHandler, InboundResult, Network, Session,
+        TcpInboundHandlerTrait,
     },
 };
 
@@ -25,7 +23,7 @@ impl InboundListener {
         addr: SocketAddr,
     ) -> Result<Vec<TaskFuture>> {
         let mut tasks: Vec<TaskFuture> = vec![];
-        if (handler.has_tcp()) {
+        if handler.has_tcp() {
             // 最初是 self.tcp_listener 写法，但会报
             // `self` does not live long enough, borrowed value does not live long enough. rustcE0597
             // 是因为 boxed() 返回 'static，tcp_listener 内部临时借用 self 来获取 dispatcher，从而产生对 self 的间接依赖。
@@ -39,7 +37,7 @@ impl InboundListener {
                 InboundListener::tcp_listener(handler.clone(), dispatcher.clone(), addr);
             tasks.push(f);
         }
-        if (handler.has_udp()) {
+        if handler.has_udp() {
             let f =
                 InboundListener::udp_listener(handler.clone(), dispatcher.clone(), addr);
             tasks.push(f);
@@ -79,12 +77,12 @@ impl InboundListener {
         task
     }
     fn udp_listener(
-        handler: AnyInboundHandler,
-        dispatcher: Arc<Dispatcher>,
+        _handler: AnyInboundHandler,
+        _dispatcher: Arc<Dispatcher>,
         addr: SocketAddr,
     ) -> TaskFuture {
         let future = async move {
-            let listener = UdpSocket::bind(addr).await.unwrap();
+            let _listener = UdpSocket::bind(addr).await.unwrap();
             info!("Udp listen at {}", addr);
             ()
         }.boxed();

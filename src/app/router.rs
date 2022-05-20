@@ -1,10 +1,10 @@
-use std::{io, sync::Arc};
+use std::{io};
 
 use anyhow::{
     Result,
     anyhow
 };
-use ipnet::{IpAddrRange, IpNet};
+use ipnet::{IpNet};
 use log::{warn, debug};
 
 use crate::{proxy::{Session, Address}, config::Rule};
