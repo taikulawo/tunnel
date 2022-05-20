@@ -12,7 +12,7 @@ use crate::{
         Address, Session,
         StreamWrapperTrait, TcpOutboundHandlerTrait,
     },
-    Config, Context,
+    config::Config, Context,
 };
 
 use super::{sniffer::Sniffer, DnsClient, OutboundManager, Router};

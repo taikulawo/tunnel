@@ -1,7 +1,7 @@
 use core::fmt;
 use std::{
     io,
-    net::{IpAddr, SocketAddr}, sync::Arc, convert::TryFrom, fmt::Display,
+    net::{IpAddr, SocketAddr}, sync::Arc, convert::TryFrom, fmt::Display, ops::Add,
 };
 
 use anyhow::{
@@ -86,20 +86,25 @@ impl Into<String> for Address {
 
 impl From<String> for Address {
     fn from(s: String) -> Self {
-        let address = match s.parse::<SocketAddr>(){
+        Address::from(&*s)
+    }
+}
+
+impl From<&str> for Address {
+    fn from(str: &str) -> Self {
+        let address = match str.parse::<SocketAddr>(){
             Ok(res) => Self::Ip(res),
             Err(_err) => {
                 // maybe a domain name
                 // if it's a bad domain:port, exception will raise when connect to it
-                let parts: Vec<&str> = s.split(':').collect();
+                let parts: Vec<&str> = str.split(':').collect();
                 let port = u16::from_str_radix(*parts.get(0).unwrap_or(&"0"), 10).unwrap();
-                Self::Domain(s, port)
+                Self::Domain(str.to_string(), port)
             }
         };
         address
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub enum Network {

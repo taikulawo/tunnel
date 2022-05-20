@@ -31,7 +31,7 @@ const TYPE_IPV4: u8 = 0x01;
 const TYPE_DOMAIN: u8 = 0x03;
 const TYPE_IPV6: u8 = 0x04;
 // as client
-async fn handshake_as_client<T>(stream: &mut T, session: &Session) -> Result<()>
+pub async fn handshake_as_client<T>(stream: &mut T, session: &Session) -> Result<()>
 where
     T: StreamWrapperTrait,
 {
@@ -81,7 +81,7 @@ fn build_request(buf: &mut Vec<u8>, session: &Session) {
 }
 
 // as server
-async fn handshake_as_server(stream: &mut TcpStream) -> Result<Session> {
+pub async fn handshake_as_server(stream: &mut TcpStream) -> Result<Session> {
     let mut buf = vec![0; 3];
     stream.read_exact(&mut buf).await?;
     let version = buf[0];

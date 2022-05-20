@@ -74,6 +74,7 @@ pub struct Rule {
     pub domain: Option<Vec<String>>,
     pub domainSuffix: Option<Vec<String>>,
     pub domainKeyword: Option<Vec<String>>,
+    pub regexp: Option<Vec<String>>,
     pub target: String,
 }
 

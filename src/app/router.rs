@@ -6,6 +6,7 @@ use anyhow::{
 };
 use ipnet::{IpNet};
 use log::{warn, debug};
+use regex::Regex;
 
 use crate::{proxy::{Session, Address}, config::Rule};
 
@@ -58,6 +59,10 @@ impl Router {
             }
             if let Some(ref cidr) = rule.ip {
                 let matcher = try_rule!(IpCidrMatcher::new(cidr.clone()));
+                router.rules.push(MatcherRule::new(rule.target.clone(), Box::new(matcher)));
+            }
+            if let Some(ref regexp) = rule.regexp {
+                let matcher = try_rule!(RegexpMatcher::new(regexp));
                 router.rules.push(MatcherRule::new(rule.target.clone(), Box::new(matcher)));
             }
         }
@@ -130,5 +135,36 @@ impl ConditionMatcher for IpCidrMatcher {
             },
             _ => false
         }
+    }
+}
+
+pub struct RegexpMatcher {
+    values: Vec<Regex>
+}
+
+impl RegexpMatcher {
+    pub fn new(values: &Vec<String>) -> io::Result<Self>{
+        let mut regexps = Vec::new();
+        for str in values {
+            let regexp = match Regex::new(str.as_str()) {
+                Ok(x) => x,
+                Err(err) => {
+                    log::error!("unknown regexp found {} {}", err, str);
+                    continue;
+                }
+            };
+            regexps.push(regexp);
+        }
+        Ok(Self { values: regexps })
+    }
+}
+
+impl ConditionMatcher for RegexpMatcher {
+    fn apply(&self, sess: &Session) -> bool {
+        for value in &self.values {
+            let dest = sess.destination.to_string();
+            return value.is_match(&dest)
+        }
+        false
     }
 }

@@ -87,27 +87,14 @@
             "target": "socks_out"
         },
         {
-            "portRange": [
-                "22-22",
-                "1024-65535"
-            ],
-            "target": "direct_out"
-        },
-        {
             "domain": [
                 "www.google.com"
             ],
             "target": "socks_out"
         },
         {
-            "domainSuffix": [
-                "google.com"
-            ],
-            "target": "socks_out"
-        },
-        {
-            "domainKeyword": [
-                "google"
+            "regexp": [
+                ".*"
             ],
             "target": "socks_out"
         }

@@ -1,8 +1,8 @@
-pub mod app;
 mod common;
-mod config;
 mod net;
-mod proxy;
+pub mod config;
+pub mod app;
+pub mod proxy;
 
 use std::{sync::Arc};
 
@@ -19,7 +19,7 @@ use anyhow::{
 };
 use tokio::{sync::{RwLock}};
 
-pub use self::config::{load_from_file, parse_from_str, Config};
+pub use self::config::{load_from_file, parse_from_str};
 
 pub struct Context {
     dns_client: Arc<RwLock<DnsClient>>,
