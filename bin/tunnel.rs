@@ -2,17 +2,20 @@ use std::{error::Error, io, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use clap::Arg;
-use futures::future;
+use futures::{future, FutureExt};
 use log::error;
 use log4rs::{
     append::console::ConsoleAppender,
     config::{Appender, Logger, Root},
     encode::{pattern::PatternEncoder, Encode},
 };
-use tokio::{runtime::Builder, sync::RwLock};
+use tokio::{
+    runtime::Builder,
+    sync::{mpsc, RwLock},
+};
 use tunnel::{
     app::{Dispatcher, DnsClient, InboundManager, OutboundManager, Router},
-    Context, start_instance,
+    newRuntime, Context, start,
 };
 
 fn load() -> Result<()> {
@@ -34,15 +37,12 @@ fn load() -> Result<()> {
             return Err(err);
         }
     };
-    let tasks = start_instance(config).unwrap();
-    let (abort_future, handler) = futures::future::abortable(futures::future::join_all(tasks));
-    let rt = Builder::new_multi_thread().enable_all().build().unwrap();
-    rt.spawn(async move {
-        tokio::signal::ctrl_c().await.unwrap();
-        println!("ctrl c received");
-        handler.abort();
-    });
-    rt.block_on(abort_future);
+    let (shutdown_future, shutdown_handler) = futures::future::abortable(futures::future::pending::<bool>());
+    let handler = async {
+        shutdown_future.await.unwrap();
+    }.boxed();
+    start(config, handler).unwrap();
+    shutdown_handler.abort();
     Ok(())
 }
 fn main() {

@@ -16,7 +16,7 @@ pub struct OutboundManager {
 }
 
 impl OutboundManager {
-    pub fn new(outbounds: &Vec<Outbound>) -> Result<OutboundManager> {
+    pub fn new(outbounds: Vec<Outbound>) -> Result<OutboundManager> {
         let mut handlers = HashMap::new();
         for outbound in outbounds.iter() {
             let handler = match &*outbound.protocol {

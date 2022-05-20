@@ -96,7 +96,7 @@ impl Dispatcher {
         router: Arc<Router>,
         dns_client: Arc<RwLock<DnsClient>>,
         outbound_manager: Arc<OutboundManager>,
-        config: &Config,
+        config: Config,
     ) -> Dispatcher {
         Dispatcher {
             ctx: context,

@@ -47,7 +47,7 @@ macro_rules! try_rule {
 }
 
 impl Router {
-    pub fn new(rules: &Vec<Rule>) -> Router {
+    pub fn new(rules: Vec<Rule>) -> Router {
         let mut router = Self {
             rules: Vec::new()
         };

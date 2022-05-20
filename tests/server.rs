@@ -12,7 +12,7 @@ use tokio::{
     net::{TcpListener, UdpSocket},
     runtime::Builder,
 };
-use tunnel::start_instance;
+use tunnel::start;
 pub async fn tcp_echo_server(addr: SocketAddr) {
     let listener = TcpListener::bind(addr).await.unwrap();
     loop {
@@ -57,13 +57,21 @@ pub fn run_two_of_echo_server(bind_addr: SocketAddr) -> Vec<BoxFuture<'static, (
     tasks.push(f);
     tasks
 }
+
+// should be called on the tokio runtime context
 pub async fn start_tunnel(config: tunnel::Config, echo_server_listening_at: String) {
     let rt = Builder::new_current_thread().enable_all().build().unwrap();
-    let mut tasks = start_instance(config).unwrap();
-
+    let (shutdown_future, shutdown_handler) = futures::future::abortable(futures::future::pending::<bool>());
+    rt.spawn_blocking(|| {
+        let handler = async {
+            shutdown_future.await.unwrap();
+        }.boxed();
+        start(config, handler).unwrap();
+    });
+    let mut tasks = Vec::new();
     // echo server is the real remote server that we want to connected.
     let mut echo_futures =
-        run_two_of_echo_server(SocketAddr::from_str(&echo_server_listening_at.as_str()).unwrap());
+    run_two_of_echo_server(SocketAddr::from_str(&echo_server_listening_at.as_str()).unwrap());
     tasks.append(&mut echo_futures);
     let (abort_future, abort_handler) =
         futures::future::abortable(futures::future::join_all(tasks));
@@ -72,4 +80,6 @@ pub async fn start_tunnel(config: tunnel::Config, echo_server_listening_at: Stri
         abort_handler.abort();
     };
     rt.block_on(futures::future::join(abort_future, test_future));
+    rt.shutdown_background();
+    shutdown_handler.abort();
 }
