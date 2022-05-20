@@ -4,7 +4,7 @@ pub mod config;
 pub mod app;
 pub mod proxy;
 
-use std::{sync::Arc};
+use std::{sync::{Arc, Once}};
 
 use app::{Dispatcher, DnsClient, InboundManager, OutboundManager, Router};
 use futures::future::BoxFuture;
@@ -52,8 +52,10 @@ pub fn start(config: config::Config, shutdown_handler: BoxFuture<'static, ()>) -
             .build(log::LevelFilter::Error),
         )
         .unwrap();
-        
-        let _handler = log4rs::init_config(logger_config).unwrap();
+        static ONCE: Once = Once::new();
+        ONCE.call_once(|| {
+            let _handler = log4rs::init_config(logger_config).unwrap();
+        });
         
         let inbound_manager = InboundManager::new(config.inbounds.clone());
         let outbound_manager = Arc::new(OutboundManager::new(config.outbounds.clone())?);

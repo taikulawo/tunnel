@@ -68,8 +68,11 @@ impl InboundListener {
                     Ok(InboundResult::Datagram(socket, sess)) => {
                         dispatcher.dispatch_udp(socket, sess).await;
                     }
+                    Ok(InboundResult::NOT_SUPPORTED) => {
+                        error!("not supported");
+                    }
                     Err(err) => {
-                        error!("handle tcp inbound failed{}", err);
+                        error!("handle tcp inbound failed err {}", err);
                     }
                 }
             }

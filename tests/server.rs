@@ -2,9 +2,10 @@
 // 所以 local-proxy inbound 只需要socks就行，
 // 其他协议的 inbound，通过 local-proxy#outbound => remote-proxy-server#inbound 测试
 
-use std::{net::SocketAddr, str::FromStr};
+use std::{net::SocketAddr, str::FromStr, time::Duration};
 
 use futures::{future::BoxFuture, FutureExt};
+use log::debug;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream, UdpSocket},
@@ -91,6 +92,7 @@ pub fn start_tunnel(
     let (abort_future, abort_handler) =
         futures::future::abortable(futures::future::join_all(tasks));
     let test_future = async {
+        tokio::time::sleep(Duration::from_millis(100)).await;
         send_data_socks5_tcp(socks_server_listening_at, echo_server_listening_at, &buf)
             .await
             .unwrap();
@@ -113,6 +115,7 @@ async fn send_data_socks5_tcp(
 ) -> anyhow::Result<()> {
     let addr = proxy_server.parse::<SocketAddr>().unwrap();
     let mut stream = TcpStream::connect(addr).await.unwrap();
+    debug!("{} {}", proxy_server, remote_server);
     let session = Session {
         destination: Address::from(remote_server),
         local_peer: stream.local_addr().unwrap(),

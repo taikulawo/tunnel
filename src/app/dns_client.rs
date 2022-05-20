@@ -39,10 +39,27 @@ pub struct DnsClient {
 
 impl DnsClient {
     pub fn new(config: Config) -> DnsClient {
-        let _dns = config.dns;
+        let mut servers = Vec::new();
+        if let Some(dns) = &config.dns {
+            if let Some(server) = &dns.servers {
+                let mut ss = Vec::new();
+                for str  in server {
+                    let addr = match str.parse::<SocketAddr>() {
+                        Ok(x) => x,
+                        Err(err) => {
+                            log::error!("{}", err);
+                            continue
+                        }
+                    };
+                    ss.push(addr);
+                }
+                servers.extend_from_slice(&ss)
+            }
+        }
+
         DnsClient {
-            remote_dns_servers: Vec::new(),
-            config: Default::default(),
+            remote_dns_servers: servers,
+            config: config,
         }
     }
     pub fn new_query(&self, host: &String, ty: RecordType) -> Message {

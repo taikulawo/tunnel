@@ -1,5 +1,7 @@
 use std::{
+    convert::TryInto,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    slice,
     str::FromStr,
 };
 
@@ -9,7 +11,6 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
-
 
 use crate::proxy::{Address, Session};
 
@@ -23,7 +24,7 @@ pub use self::outbound::TcpOutboundHandler;
 pub use self::outbound::UdpOutboundHandler;
 
 use super::{Network, StreamWrapperTrait};
-const NO_AUTHENTICATION_REQUIRED: u8 = 0x01;
+const NO_AUTHENTICATION_REQUIRED: u8 = 0x00;
 const CMD_CONNECT: u8 = 0x01;
 const CMD_BIND: u8 = 0x02;
 const CMD_UDP_ASSOCIATE: u8 = 0x03;
@@ -53,8 +54,8 @@ where
 }
 
 fn build_request(buf: &mut Vec<u8>, session: &Session) {
+    // TODO support more ATYP instead of only CONNECT
     buf.extend(&[0x05, 0x01, 0x00]);
-    buf.extend(&[CMD_CONNECT]); // TODO support more ATYP instead of only CONNECT
     match session.destination {
         Address::Domain(ref name, _) => {
             buf.push(TYPE_DOMAIN);
@@ -104,21 +105,16 @@ pub async fn handshake_as_server(stream: &mut TcpStream) -> Result<Session> {
         TYPE_IPV4 => {
             buf.resize(4, 0);
             stream.read_exact(&mut buf).await?;
-            let str = String::from_utf8_lossy(&buf);
-            let ipv4 = match Ipv4Addr::from_str(&str) {
-                Ok(x) => x,
-                Err(err) => bail!("should be ipv4 {} {:?}", err, &buf),
-            };
+            let ipv4 = Ipv4Addr::new(buf[0], buf[1], buf[2], buf[3]);
             Address::Ip(SocketAddr::new(IpAddr::V4(ipv4), 0))
         }
         TYPE_IPV6 => {
             buf.resize(16, 0);
             stream.read_exact(&mut buf).await?;
-            let str = String::from_utf8_lossy(&buf);
-            let ipv6 = match Ipv6Addr::from_str(&str) {
-                Ok(x) => x,
-                Err(err) => bail!("should be ipv6 {} {:?}", err, &buf),
-            };
+            let buf: &[u16] = unsafe { slice::from_raw_parts(buf.as_ptr() as *const _, 8) };
+            let ipv6 = Ipv6Addr::new(
+                buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
+            );
             Address::Ip(SocketAddr::new(IpAddr::V6(ipv6), 0))
         }
         _ => bail!("unknown atyp {}", buf[3]),

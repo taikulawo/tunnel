@@ -168,6 +168,7 @@ pub fn create_bounded_tcp_socket(addr: SocketAddr) -> io::Result<TcpSocket> {
 pub enum InboundResult {
     Stream(TcpStream, Session),
     Datagram(UdpSocket, Session),
+    NOT_SUPPORTED
 }
 
 pub type AnyTcpInboundHandler = Arc<dyn TcpInboundHandlerTrait>;
@@ -195,14 +196,20 @@ impl InboundHandlerTrait for InboundHandler {
 
 #[async_trait]
 impl TcpInboundHandlerTrait for InboundHandler {
-    async fn handle(&self, _sess: Session, _stream: TcpStream) -> io::Result<InboundResult> {
-        todo!()
+    async fn handle(&self, sess: Session, stream: TcpStream) -> io::Result<InboundResult> {
+        if let Some(handler) = &self.tcp_handler {
+            return handler.handle(sess, stream).await;
+        }
+        Ok(InboundResult::NOT_SUPPORTED)
     }
 }
 #[async_trait]
 impl UdpInboundHandlerTrait for InboundHandler {
-    async fn handle(&self, _sess: Session, _socket: UdpSocket) -> io::Result<InboundResult> {
-        todo!()
+    async fn handle(&self, sess: Session, socket: UdpSocket) -> io::Result<InboundResult> {
+        if let Some(handler) = &self.udp_handler {
+            return handler.handle(sess, socket).await;
+        }
+        Ok(InboundResult::NOT_SUPPORTED)
     }
 }
 
