@@ -47,7 +47,7 @@ impl DnsClient {
                     let addr = match str.parse::<SocketAddr>() {
                         Ok(x) => x,
                         Err(err) => {
-                            log::error!("{}", err);
+                            log::warn!("{} ip:{}", err, str);
                             continue
                         }
                     };

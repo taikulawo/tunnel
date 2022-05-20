@@ -69,29 +69,7 @@ impl Display for Address {
 impl TryFrom<(String, u16)> for Address {
     type Error = io::Error;
     fn try_from(value: (String, u16)) -> Result<Self, Self::Error> {
-        Ok(Address::Domain(value.0, value.1))
-    }
-}
-
-impl Into<String> for Address {
-    fn into(self) -> String {
-        match self {
-            Address::Domain(name, port) => {
-                format!("{}:{}",name, port)
-            },
-            Address::Ip(addr) => addr.to_string()
-        }
-    }
-}
-
-impl From<String> for Address {
-    fn from(s: String) -> Self {
-        Address::from(&*s)
-    }
-}
-
-impl From<&str> for Address {
-    fn from(str: &str) -> Self {
+        let str = value.0;
         let address = match str.parse::<SocketAddr>(){
             Ok(res) => Self::Ip(res),
             Err(_err) => {
@@ -102,7 +80,22 @@ impl From<&str> for Address {
                 Self::Domain(str.to_string(), port)
             }
         };
-        address
+        Ok(address)
+    }
+}
+pub fn addr_to_tuple(str: &str) -> (String, u16){
+    let addrs: Vec<&str> = str.split(":").collect();
+    let buf = &*addrs;
+    (buf[0].to_owned(), u16::from_str_radix(buf[1], 10).unwrap())
+}
+impl Into<String> for Address {
+    fn into(self) -> String {
+        match self {
+            Address::Domain(name, port) => {
+                format!("{}:{}",name, port)
+            },
+            Address::Ip(addr) => addr.to_string()
+        }
     }
 }
 
