@@ -71,8 +71,8 @@ impl TryFrom<(String, u16)> for Address {
     fn try_from(value: (String, u16)) -> Result<Self, Self::Error> {
         let str = value.0;
         let port = value.1;
-        let address = match str.parse::<SocketAddr>(){
-            Ok(res) => Self::Ip(res),
+        let address = match str.parse::<IpAddr>(){
+            Ok(res) => Self::Ip(SocketAddr::new(res, port)),
             Err(_err) => {
                 // maybe a domain name
                 // if it's a bad domain:port, exception will raise when connect to it
