@@ -58,7 +58,7 @@
         {
             "protocol": "socks",
             "settings": {
-                "address": "192.168.3.2",
+                "address": "127.0.0.1",
                 "port": 7890
             },
             "tag": "socks_out"

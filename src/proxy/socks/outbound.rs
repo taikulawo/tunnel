@@ -1,7 +1,7 @@
 use std::{sync::Arc};
 
 use async_trait::async_trait;
-use log::debug;
+use log::{debug, trace};
 use tokio::{net::{TcpStream, UdpSocket}};
 
 use crate::{
@@ -21,6 +21,7 @@ pub struct TcpOutboundHandler {
 #[async_trait]
 impl TcpOutboundHandlerTrait for TcpOutboundHandler {
     async fn handle(&self, ctx: Arc<Context>, session: &Session) -> anyhow::Result<TcpStream> {
+        trace!("connect to socks proxy server {}", self.address);
         let mut stream = connect_to_remote_tcp(ctx.dns_client.clone(), self.address.clone()).await?;
         match handshake_as_client(&mut stream, &session).await {
             Err(err) => {

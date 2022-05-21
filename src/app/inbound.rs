@@ -69,6 +69,9 @@ impl InboundManager {
                 tasks.append(&mut future);
             }
         }
-        Ok(futures::future::join_all(tasks).map(|_x| ()).boxed())
+        Ok(async {
+            futures::future::join_all(tasks).await;
+            let a = 1;
+        }.boxed())
     }
 }

@@ -18,7 +18,6 @@ use trust_dns_proto::{
 };
 
 use crate::{
-    common::{get_default_ipv4_gateway, get_default_ipv6_gateway},
     config::{Config, GeneralSettings},
     proxy::create_bounded_udp_socket,
 };

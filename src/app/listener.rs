@@ -52,30 +52,42 @@ impl InboundListener {
         let task = async move {
             let listener = TcpListener::bind(addr).await.unwrap();
             info!("Tcp listening at {}", addr);
-            for (conn, ..) in listener.accept().await {
-                let dispatcher = Arc::clone(&dispatcher);
-                let addr = conn.peer_addr().expect("peer");
-                let local = conn.local_addr().expect("local");
-                let session = Session {
-                    destination: Address::Ip(addr),
-                    network: Network::TCP,
-                    local_peer: local,
-                    peer_address: conn.peer_addr().expect("peer")
-                };
-                match TcpInboundHandlerTrait::handle(&*handler, session, conn).await {
-                    Ok(InboundResult::Stream(stream, mut sess)) => {
-                        dispatcher.dispatch_tcp(stream, &mut sess).await;
-                    }
-                    Ok(InboundResult::Datagram(socket, sess)) => {
-                        dispatcher.dispatch_udp(socket, sess).await;
-                    }
-                    Ok(InboundResult::NOT_SUPPORTED) => {
-                        error!("not supported");
+            loop {
+                match listener.accept().await {
+                    Ok((conn, _)) => {
+                        let dispatcher = Arc::clone(&dispatcher);
+                        let handler = handler.clone();
+                        tokio::spawn(async move {
+                            let addr = conn.peer_addr().expect("peer");
+                            let local = conn.local_addr().expect("local");
+                            let session = Session {
+                                destination: Address::Ip(addr),
+                                network: Network::TCP,
+                                local_peer: local,
+                                peer_address: conn.peer_addr().expect("peer")
+                            };
+                            match TcpInboundHandlerTrait::handle(&*handler, session, conn).await {
+                                Ok(InboundResult::Stream(stream, mut sess)) => {
+                                    dispatcher.dispatch_tcp(stream, &mut sess).await;
+                                }
+                                Ok(InboundResult::Datagram(socket, sess)) => {
+                                    dispatcher.dispatch_udp(socket, sess).await;
+                                }
+                                Ok(InboundResult::NOT_SUPPORTED) => {
+                                    error!("not supported");
+                                }
+                                Err(err) => {
+                                    error!("handle tcp inbound failed err {}", err);
+                                }
+                            }
+                        });
                     }
                     Err(err) => {
-                        error!("handle tcp inbound failed err {}", err);
+                        error!("accept error {}", err);
+                        return;
                     }
                 }
+
             }
         }.boxed();
         task

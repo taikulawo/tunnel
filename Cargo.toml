@@ -12,14 +12,12 @@ path = "bin/tunnel.rs"
 
 [dependencies]
 tokio = { version = "1.11.0", features = ["full"] }
-tun = { version = "0.5.3", features = ["async"] }
 ipnet = { version = "2.3.1" }
 etherparse = "0.9.0"
 log4rs = "1.0.0"
 log = "0.4.14"
 lru_time_cache = "0.11.11"
-rand = "0.8.4"
-libc = "0.2.102"
+rand = { version = "0.8.4"}
 pin-project = "1.0.8"
 trust-dns-proto = "0.20.3"
 socket2 = "0.4.2"
@@ -35,3 +33,7 @@ thiserror = "1.0.31"
 futures = "0.3"
 json_comments = "0.2.1"
 regex = "1"
+
+[target.'cfg(any(target_os = "macos", target_os = "linux"))'.dependencies]
+libc = "0.2.102"
+tun = { version = "0.5.3", features = ["async"] }

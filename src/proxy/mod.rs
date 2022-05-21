@@ -8,6 +8,7 @@ use anyhow::{
     anyhow
 };
 use async_trait::async_trait;
+use log::trace;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use thiserror::Error;
 use tokio::{
@@ -17,6 +18,7 @@ use tokio::{
 
 use crate::{app::DnsClient, Context};
 
+#[cfg(target_os = "unix")]
 mod tun;
 pub mod socks;
 pub mod direct;
@@ -283,12 +285,8 @@ impl<T> StreamWrapperTrait for T where T: AsyncRead + AsyncWrite + Send + Sync +
 
 pub async fn connect_to_remote_tcp(dns_client:Arc<RwLock<DnsClient>>, addr: Address) -> anyhow::Result<TcpStream>{
     let socket_addr = name_to_socket_addr(dns_client, addr).await?;
-    // 这样可以
+    trace!("resolved remote addr {}", socket_addr);
     Ok(TcpStream::connect(socket_addr).await?)
-    // 但下面不行
-    // TcpStream::connect(socket_addr).await
-    // 原因是 ? 进行 type conversion, anyhow::Result 实现了 from io::Error 转换
-    // https://stackoverflow.com/a/62241599/7529562
 }
 
 pub async fn name_to_socket_addr(dns_client: Arc<RwLock<DnsClient>>, addr: Address) -> anyhow::Result<SocketAddr> {

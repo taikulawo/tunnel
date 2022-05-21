@@ -75,11 +75,11 @@ impl Dispatcher {
                 Ok(res) => res,
                 Err(err) => {
                     debug!(
-                        "connect to {} failed. connection {} -> {} {}",
-                        sess.destination.to_string(),
-                        sess.local_peer,
+                        "Error {}, destination: {}. connection {} => {} => tunnel",
+                        err,
                         sess.destination,
-                        err
+                        sess.peer_address,
+                        sess.local_peer,
                     );
                     return;
                 }
