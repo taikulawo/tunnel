@@ -76,7 +76,7 @@ pub fn start_tunnel(
         abort_handlers.push(shutdown_handler);
         rt.spawn_blocking(|| {
             let handler = async {
-                shutdown_future.await.unwrap();
+                shutdown_future.await;
             }
             .boxed();
             start(config, handler).unwrap();
@@ -124,7 +124,7 @@ async fn send_data_socks5_tcp(
     };
     tunnel::proxy::socks::handshake_as_client(&mut stream, &session).await?;
     stream.write_all(&buf).await?;
-    let mut received = Vec::with_capacity(buf.len());
+    let mut received = vec![0; buf.len()];
     stream.read_exact(&mut received).await.unwrap();
     assert_eq!(buf, received);
     Ok(())
