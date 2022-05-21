@@ -126,5 +126,5 @@ fn start() {
         let c = serde_json::from_str(config).unwrap();
         configs.push(c);
     }
-    server::start_tunnel(configs, "127.0.0.1:3002","127.0.0.1:1080");
+    server::start_tunnel(configs, "127.0.0.1:12346","127.0.0.1:1080");
 }

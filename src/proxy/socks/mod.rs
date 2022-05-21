@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Result};
+use log::trace;
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -135,6 +136,8 @@ pub async fn handshake_as_server(stream: &mut TcpStream) -> Result<Session> {
             }
         },
     };
+    let buf = [0x05, 0x00, 0x00, 0x01, 0x00, 0x00,0x00,0x00, 0x00,0x00];
+    stream.write_all(&buf).await;
     let res = Session {
         destination: address,
         network: Network::TCP,

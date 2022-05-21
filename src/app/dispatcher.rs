@@ -1,7 +1,7 @@
 use std::{convert::TryFrom, sync::Arc};
 
 
-use log::{debug, error};
+use log::{debug, error, trace};
 use tokio::{
     net::{TcpStream, UdpSocket},
     sync::RwLock,
@@ -85,6 +85,7 @@ impl Dispatcher {
                 }
             };
         // start pipe
+        trace!("connection established {} => {} => {}", sess.local_peer, remote_stream.local_addr().unwrap(), sess.destination);
         tokio::io::copy_bidirectional(&mut local_stream, &mut remote_stream).await;
     }
 
