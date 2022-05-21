@@ -106,10 +106,13 @@ pub enum Network {
 // connection session
 #[derive(Debug, Clone)]
 pub struct Session {
+    // 真正要连接的 remote
     pub destination: Address,
     // 连接到本地代理服务器的remote
     // local_peer <=> tunnel
     pub local_peer: SocketAddr,
+    // 连接到本地的对端socket
+    pub peer_address: SocketAddr,
     
     pub network: Network
 }

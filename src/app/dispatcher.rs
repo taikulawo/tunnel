@@ -85,8 +85,13 @@ impl Dispatcher {
                 }
             };
         // start pipe
-        trace!("connection established {} => {} => {}", sess.local_peer, remote_stream.local_addr().unwrap(), sess.destination);
-        tokio::io::copy_bidirectional(&mut local_stream, &mut remote_stream).await;
+        trace!("connection established {} => {} => tunnel => {} => {}",sess.peer_address, sess.local_peer, remote_stream.local_addr().unwrap(), sess.destination);
+        match tokio::io::copy_bidirectional(&mut local_stream, &mut remote_stream).await {
+            Err(err) => {
+                debug!("error when in copy bidirectional {}", err);
+            }
+            _ => {}
+        };
     }
 
     pub async fn dispatch_udp(&self, _socket: UdpSocket, _sess: Session) {}

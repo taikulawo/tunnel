@@ -142,6 +142,7 @@ pub async fn handshake_as_server(stream: &mut TcpStream) -> Result<Session> {
         destination: address,
         network: Network::TCP,
         local_peer: stream.local_addr().expect("local"),
+        peer_address: stream.peer_addr().expect("peer"),
     };
     Ok(res)
 }

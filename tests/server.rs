@@ -120,6 +120,7 @@ async fn send_data_socks5_tcp(
         destination: Address::try_from(addr_to_tuple(remote_server)).unwrap(),
         local_peer: stream.local_addr().unwrap(),
         network: tunnel::proxy::Network::TCP,
+        peer_address: stream.peer_addr().unwrap()
     };
     tunnel::proxy::socks::handshake_as_client(&mut stream, &session).await?;
     stream.write_all(&buf).await?;

@@ -60,6 +60,7 @@ impl InboundListener {
                     destination: Address::Ip(addr),
                     network: Network::TCP,
                     local_peer: local,
+                    peer_address: conn.peer_addr().expect("peer")
                 };
                 match TcpInboundHandlerTrait::handle(&*handler, session, conn).await {
                     Ok(InboundResult::Stream(stream, mut sess)) => {
