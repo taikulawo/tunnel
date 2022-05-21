@@ -1,5 +1,4 @@
-use std::{convert::TryFrom, sync::Arc};
-
+use std::{convert::TryFrom, sync::Arc, net::SocketAddr};
 
 use log::{debug, error, trace};
 use tokio::{
@@ -8,11 +7,9 @@ use tokio::{
 };
 
 use crate::{
-    proxy::{
-        Address, Session,
-        StreamWrapperTrait, TcpOutboundHandlerTrait,
-    },
-    config::Config, Context,
+    config::Config,
+    proxy::{Address, Session, StreamWrapperTrait, TcpOutboundHandlerTrait},
+    Context,
 };
 
 use super::{sniffer::Sniffer, DnsClient, OutboundManager, Router};
@@ -79,13 +76,37 @@ impl Dispatcher {
                 Err(err) => {
                     debug!(
                         "connect to {} failed. connection {} -> {} {}",
-                        sess.destination.to_string(), sess.local_peer, sess.destination, err
+                        sess.destination.to_string(),
+                        sess.local_peer,
+                        sess.destination,
+                        err
                     );
                     return;
                 }
             };
         // start pipe
-        trace!("connection established {} => {} => tunnel => {} => {}",sess.peer_address, sess.local_peer, remote_stream.local_addr().unwrap(), sess.destination);
+        let local_addr = match remote_stream.local_addr() {
+            Ok(res) => res.to_string(),
+            Err(err) => {
+                debug!("{}", err);
+                "unknown".to_string()
+            }
+        };
+        let peer_addr = match remote_stream.peer_addr() {
+            Ok(res) => res.to_string(),
+            Err(err) => {
+                debug!("{}", err);
+                "unknown".to_string()
+            }
+        };
+        trace!(
+            "connection established {} => {} => tunnel => {} => {}. Final destination: {}",
+            sess.peer_address,
+            sess.local_peer,
+            local_addr,
+            peer_addr,
+            sess.destination
+        );
         match tokio::io::copy_bidirectional(&mut local_stream, &mut remote_stream).await {
             Err(err) => {
                 debug!("error when in copy bidirectional {}", err);
