@@ -121,7 +121,7 @@ impl DnsClient {
                 Ok(ref mut x) => {
                     ips.append(x);
                 }
-                Err(err) => return Err(anyhow!("lookup failed {}", err)),
+                Err(err) => return Err(anyhow!("lookup failed error {}", err)),
             }
         }
         Ok(ips)
@@ -131,7 +131,7 @@ impl DnsClient {
         host: &str,
         server: &SocketAddr,
     ) -> Result<Vec<IpAddr>> {
-        trace!("look up {} on {}", host, &server);
+        trace!("lookup {} on DNS server {}", host, &server);
         let socket = match server {
             SocketAddr::V4(_v4) => {
                 // let bind_addr = get_default_ipv4_gateway()?;

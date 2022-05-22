@@ -8,7 +8,7 @@ use anyhow::{
     anyhow
 };
 use async_trait::async_trait;
-use log::trace;
+use log::{trace, debug};
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use thiserror::Error;
 use tokio::{
@@ -286,7 +286,10 @@ impl<T> StreamWrapperTrait for T where T: AsyncRead + AsyncWrite + Send + Sync +
 pub async fn connect_to_remote_tcp(dns_client:Arc<RwLock<DnsClient>>, addr: Address) -> anyhow::Result<TcpStream>{
     let socket_addr = name_to_socket_addr(dns_client, addr).await?;
     trace!("resolved remote addr {}", socket_addr);
-    Ok(TcpStream::connect(socket_addr).await?)
+    TcpStream::connect(socket_addr).await.or_else(|err| {
+        debug!("error when connect to {}, error {}", socket_addr, err);
+        Err(err.into())
+    })
 }
 
 pub async fn name_to_socket_addr(dns_client: Arc<RwLock<DnsClient>>, addr: Address) -> anyhow::Result<SocketAddr> {

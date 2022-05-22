@@ -98,5 +98,11 @@
             ],
             "target": "socks_out"
         }
+        // {
+        //     "regexp": [
+        //         ".*"
+        //     ],
+        //     "target": "direct_out"
+        // }
     ]
 }

@@ -25,7 +25,7 @@ fn load() -> Result<()> {
     let config = match tunnel::load_from_file(config_path) {
         Ok(x) => x,
         Err(err) => {
-            error!("failed to load config file {} {}", config_path, err);
+            eprintln!("failed to load config file {} {}", config_path, err);
             return Err(err);
         }
     };
