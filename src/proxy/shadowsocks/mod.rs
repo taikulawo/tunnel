@@ -11,7 +11,7 @@ use std::{
 };
 use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf, AsyncWrite};
 
-use self::cipher::{Method, INFOS};
+use self::cipher::{Method, INFOS, AEADCipher};
 
 mod cipher;
 
@@ -34,6 +34,8 @@ struct ShadowsocksStream<T> {
     write_buf: BytesMut,
     read_state: ReadState,
     write_state: WriteState,
+    // WaitingSalt 阶段才能初始化
+    cipher: Option<AEADCipher>
 }
 
 // https://github.com/v2fly/v2ray-core/blob/ca5695244c383870aed1976a59ae6e5eda94f999/proxy/shadowsocks/config.go#L228
@@ -45,7 +47,8 @@ impl<T> ShadowsocksStream<T> {
             read_buf: BytesMut::new(),
             write_buf: BytesMut::new(),
             read_state: ReadState::WaitingSalt,
-            write_state: WriteState::WaitingSalt
+            write_state: WriteState::WaitingSalt,
+            cipher: None
         })
     }
 }
