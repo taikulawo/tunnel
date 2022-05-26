@@ -100,7 +100,7 @@ impl Dispatcher {
             }
         };
         trace!(
-            "connection established {} => {} => tunnel => {} => {}. Final destination: {}",
+            "connection established. {} => {} => tunnel => {} => {}. Final destination: {}",
             sess.peer_address,
             sess.local_peer,
             local_addr,

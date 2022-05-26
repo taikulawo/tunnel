@@ -22,6 +22,7 @@ use crate::{app::DnsClient, Context};
 mod tun;
 pub mod socks;
 pub mod direct;
+mod shadowsocks;
 pub enum NetworkType {
     TCP,
     UDP,
