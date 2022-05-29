@@ -3,7 +3,7 @@ use core::fmt;
 use futures::ready;
 use lazy_static::lazy_static;
 use md5::{Digest, Md5};
-use rand::{Rng, SeedableRng};
+use rand::{prelude::StdRng, Rng, SeedableRng};
 use std::{
     collections::HashMap,
     io,
@@ -156,10 +156,9 @@ where
                     buf.put_slice(&self.read_buf[..remaining]);
                     if remaining < n {
                         self.read_state = ReadState::WaitingPayload(n - remaining);
-                    }else {
+                    } else {
                         self.read_buf.clear();
                         self.read_state = ReadState::WaitingLength;
-
                     }
                     return Ok(()).into();
                 }
@@ -186,7 +185,7 @@ where
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
-        let me = &mut * self;
+        let me = &mut *self;
         loop {
             match me.write_state {
                 WriteState::WaitingSalt => {
@@ -213,8 +212,7 @@ where
                     let real_payload_len = buf.len() as u16;
 
                     me.write_buf.reserve(encrypted_payload_length);
-                    me.write_buf
-                        .put_slice(&u16::to_be_bytes(real_payload_len));
+                    me.write_buf.put_slice(&u16::to_be_bytes(real_payload_len));
                     let enc = me.encryptor.as_mut().unwrap();
                     enc.encrypt(&mut me.write_buf)
                         .map_err(|x| map_crypto_error())?;
@@ -230,14 +228,16 @@ where
                 }
                 WriteState::WritingChunk(ref mut total_len) => {
                     // write all
-                    while(*total_len < me.write_buf.len()) {
-                        let n = ready!(Pin::new(&mut me.stream).poll_write(cx, &me.write_buf[*total_len ..]))?;
+                    while (*total_len < me.write_buf.len()) {
+                        let n =
+                            ready!(Pin::new(&mut me.stream)
+                                .poll_write(cx, &me.write_buf[*total_len..]))?;
                         *total_len += n;
                     }
                     me.write_buf.clear();
                     let len = *total_len;
                     me.write_state = WriteState::WaitingChunk;
-                    return Ok(len).into()
+                    return Ok(len).into();
                 }
             }
         }
@@ -246,27 +246,58 @@ where
 
 pub struct ShadowDatagram {
     psk: Vec<u8>,
-    cipher: AEADCipher
+    cipher: AEADCipher,
 }
 
+// https://github.com/v2fly/v2ray-core/blob/0746740b1072185634ef0873f1607f922a28efea/proxy/shadowsocks/protocol.go#L185
+// original [salt][target_address][forwarded data]
+// encrypted [salt][encrypted_length][tag][    encrypted_payload            ][tag]
+//                                        <-target_address || forwarded data->
+// nonce 都从1开始，但由于UDP只使用一次，所以nonce一直都是 1 ？
+// https://github.com/v2fly/v2ray-core/blob/3ef7feaeaf737d05c5a624c580633b7ce0f0f1be/common/crypto/auth.go#L73
 impl ShadowDatagram {
-    pub fn new(method: Method, password: &str) -> io::Result<Self>{
+    pub fn new(method: Method, password: &str) -> io::Result<Self> {
         let m = INFOS.get(&method).unwrap();
         let strong_password = password_to_cipher_key(password, m.key_len)?;
         let cipher = AEADCipher::new(m.algorithm);
         Ok(Self {
             cipher,
-            psk: strong_password
+            psk: strong_password,
         })
     }
 
     // 20220529 shadowsocks.org 一直无法访问
-    // shadowsocks udp 参考
-    // pub fn encrypt(&self, buf: &BytesMut) -> io::Result<()> {
+    // shadowsocks udp 参考 v2ray
+    pub fn encrypt(&self, mut buf: BytesMut) -> io::Result<Vec<u8>> {
+        // generate salt
+        let salt_len = self.cipher.key_len();
+        let mut encrypted_buf = Vec::new();
+        let mut rng = StdRng::from_entropy();
+        for i in 0..salt_len {
+            encrypted_buf[i] = rng.gen();
+        }
+        let mut encryptor = self
+            .cipher
+            .encryptor(&self.psk, &encrypted_buf[..salt_len])
+            .map_err(|x| map_crypto_error())?;
+        encryptor.encrypt(&mut buf).map_err(|x| map_crypto_error())?;
+        encrypted_buf.extend_from_slice(&buf);
+        Ok(encrypted_buf)
+    }
 
-    // }
+    pub fn decrypt(&self, mut buf: BytesMut) -> io::Result<Vec<u8>> {
+        let salt_len = self.cipher.key_len();
+        let salt = &buf[..salt_len];
+        let mut decryptor = self.cipher.decryptor(&self.psk, salt).map_err(|x|map_crypto_error())?;
+        let decrypted_data = &mut buf.split_off(salt_len);
+        let before_decrpyt_len = decrypted_data.len();
+        decryptor.decrypt(decrypted_data).map_err(|x|map_crypto_error())?;
+        let valid_data_len = before_decrpyt_len - self.cipher.tag_len();
+        let mut v = Vec::with_capacity(valid_data_len);
+        v.extend_from_slice(&decrypted_data[..valid_data_len]);
+        Ok(v)
+    }
 }
-
 
 #[test]
 fn stream_test() {
