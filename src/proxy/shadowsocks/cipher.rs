@@ -5,7 +5,7 @@ use ring::aead::{self, Aad, Algorithm, BoundKey, LessSafeKey, Nonce, NonceSequen
 use sha1::Sha1;
 use std::{collections::HashMap, fmt, io};
 
-fn password_to_cipher_key(password: &str, cipher_len: usize) -> io::Result<Vec<u8>> {
+pub fn password_to_cipher_key(password: &str, cipher_len: usize) -> io::Result<Vec<u8>> {
     let pass_bytes = password.as_bytes();
     fn calc(data: &[u8]) -> Vec<u8> {
         let mut hasher = Md5::new();
@@ -90,7 +90,7 @@ impl NonceSequenceGenerator {
     }
 }
 
-fn hkdf(strong_passwd: &[u8], salt: &[u8], info: &[u8], len: usize) -> anyhow::Result<Vec<u8>> {
+pub fn hkdf(strong_passwd: &[u8], salt: &[u8], info: &[u8], len: usize) -> anyhow::Result<Vec<u8>> {
     let (_, hkdf_struct) = hkdf::Hkdf::<Sha1>::extract(Some(salt), strong_passwd);
     let mut v = vec![0u8; len];
     hkdf_struct
@@ -100,26 +100,29 @@ fn hkdf(strong_passwd: &[u8], salt: &[u8], info: &[u8], len: usize) -> anyhow::R
 }
 
 pub struct AEADCipher {
-    encryptor: AeadEncryptor,
-    decryptor: AeadDecryptor,
+    algorithm: &'static Algorithm,
 }
 
-struct AeadEncryptor {
+pub struct AeadEncryptor {
     nonce: NonceSequenceGenerator,
     key: LessSafeKey,
 }
 
 impl AeadEncryptor {
-    pub fn new(psk: &[u8], algorithm: &'static Algorithm, key_len: usize) -> anyhow::Result<Self> {
-        let nonce_sequence = NonceSequenceGenerator::new(key_len);
-        let key = UnboundKey::new(&algorithm, psk).map_err(|_| anyhow!("unboundKey failed"))?;
+    pub fn new(valid_key_from_hkdf: &[u8], algorithm: &'static Algorithm) -> anyhow::Result<Self> {
+        let nonce_sequence = NonceSequenceGenerator::new(algorithm.key_len());
+        let key = UnboundKey::new(&algorithm, valid_key_from_hkdf)
+            .map_err(|_| anyhow!("unboundKey failed"))?;
         Ok(Self {
             key: LessSafeKey::new(key),
             nonce: nonce_sequence,
         })
     }
 
-    pub fn encrypt(&mut self, in_out: &mut Vec<u8>) -> anyhow::Result<()> {
+    pub fn encrypt<T>(&mut self, in_out: &mut T) -> anyhow::Result<()>
+    where
+        T: AsMut<[u8]> + for<'in_out> Extend<&'in_out u8>,
+    {
         let nonce = Nonce::try_assume_unique_for_key(&*self.nonce.increase())
             .map_err(|_| anyhow!("nonce create failed"))?;
         self.key
@@ -128,46 +131,53 @@ impl AeadEncryptor {
     }
 }
 
-struct AeadDecryptor {
+pub struct AeadDecryptor {
     nonce: NonceSequenceGenerator,
     key: LessSafeKey,
 }
 
 impl AeadDecryptor {
-    pub fn new(psk: &[u8], algorithm: &'static Algorithm, key_len: usize) -> anyhow::Result<Self> {
-        let nonce_sequence = NonceSequenceGenerator::new(key_len);
+    pub fn new(psk: &[u8], algorithm: &'static Algorithm) -> anyhow::Result<Self> {
+        let nonce_sequence = NonceSequenceGenerator::new(algorithm.key_len());
         let key = UnboundKey::new(&algorithm, psk).map_err(|_| anyhow!("unboundKey failed"))?;
         Ok(Self {
             key: LessSafeKey::new(key),
             nonce: nonce_sequence,
         })
     }
-    pub fn decrypt(&mut self, in_out: &mut Vec<u8>) -> anyhow::Result<()> {
+    pub fn decrypt<T>(&mut self, in_out: &mut T) -> anyhow::Result<()>
+    where
+        T: AsMut<[u8]>,
+    {
         let nonce = Nonce::try_assume_unique_for_key(&*self.nonce.increase())
             .map_err(|_| anyhow!("nonce create failed"))?;
         self.key
-            .open_in_place(nonce, Aad::empty(), in_out)
-            .map_err(|_| anyhow!(" decrypt failed"))
-            .map_err(|_| anyhow!("decrypt failed"))?;
+            .open_in_place(nonce, Aad::empty(), in_out.as_mut())
+            .map_err(|_| anyhow!(" decrypt failed"))?;
         Ok(())
     }
 }
 impl AEADCipher {
-    pub fn new(user_password: &str, salt: &[u8], method: Method) -> anyhow::Result<AEADCipher> {
-        let m = INFOS.get(&method).unwrap();
-        // generate strong password
-        let strong_password = password_to_cipher_key(user_password, m.key_len)?;
-        let psk = hkdf(
-            &strong_password,
-            salt,
-            String::from("ss-subkey").as_bytes(),
-            m.key_len,
-        )?;
-        let encryptor = AeadEncryptor::new(psk.as_ref(), m.algorithm, m.key_len)?;
-        let decryptor = AeadDecryptor::new(psk.as_ref(), m.algorithm, m.key_len)?;
-        Ok(AEADCipher {
-            encryptor: encryptor,
-            decryptor: decryptor,
-        })
+    pub fn new(algorithm: &'static Algorithm) -> Self {
+        Self { algorithm }
+    }
+
+    pub fn encryptor(&self, psk: &[u8], salt: &[u8]) -> anyhow::Result<AeadEncryptor> {
+        let s = String::from("ss-subkey");
+        let info = s.as_bytes();
+        let key = hkdf(psk, salt, info, self.algorithm.key_len())?;
+        AeadEncryptor::new(key.as_ref(), self.algorithm)
+    }
+    pub fn decryptor(&self, psk: &[u8], salt: &[u8]) -> anyhow::Result<AeadDecryptor> {
+        let s = String::from("ss-subkey");
+        let info = s.as_bytes();
+        let key = hkdf(psk, salt, info, self.algorithm.key_len())?;
+        AeadDecryptor::new(psk, self.algorithm)
+    }
+    pub fn key_len(&self) -> usize {
+        self.algorithm.key_len()
+    }
+    pub fn tag_len(&self) -> usize {
+        self.algorithm.tag_len()
     }
 }
