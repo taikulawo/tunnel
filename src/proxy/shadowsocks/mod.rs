@@ -1,26 +1,20 @@
 use bytes::{Buf, BufMut, BytesMut};
-use core::fmt;
 use futures::ready;
-use lazy_static::lazy_static;
-use md5::{Digest, Md5};
 use rand::{prelude::StdRng, Rng, SeedableRng};
 use std::{
-    collections::HashMap,
     io,
-    mem::MaybeUninit,
     pin::Pin,
-    slice,
     task::{Context, Poll},
 };
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, ReadBuf};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use self::cipher::{
-    hkdf, password_to_cipher_key, AEADCipher, AeadDecryptor, AeadEncryptor, Method, INFOS,
+    password_to_cipher_key, AEADCipher, AeadDecryptor, AeadEncryptor, Method, INFOS,
 };
 
 mod cipher;
 
-const MAX_PAYLOAD_LEN: u16 = 0x3fff;
+const MAX_PAYLOAD_LEN: usize = 0x3fff;
 
 enum ReadState {
     // 开始阶段，等待协议开头的salt
@@ -36,6 +30,12 @@ enum WriteState {
 }
 // shadowsocks 协议分析
 // https://chaochaogege.com/2022/05/24/58/
+// 针对 0x3fff 的处理我看到的有三种种
+// 1. poll_write 调用只处理 Min(buf.len(), 0x3fff)，并返回consumed的size，caller判断若 consumed < buf.len()，需再次poll_write
+// 2. 从 socket 读取数据时即限制 size，buffer最多只能读取 0x3fff，后续就可不再对 0x3fff 进行处理
+// 3. v2ray 中没搜到 0x3fff，似乎 v2ray 并没处理 0x3fff ??
+
+// 我需要直接将buf一次搞完吗？如果超过 0x3fff，内部loop继续处理，还是和1一样呢？
 struct ShadowsocksStream<T> {
     stream: T,
     read_buf: BytesMut,
@@ -183,9 +183,10 @@ where
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &[u8],
+        mut buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
         let me = &mut *self;
+        let mut total_buf_len = buf.len();
         loop {
             match me.write_state {
                 WriteState::WaitingSalt => {
@@ -208,7 +209,10 @@ where
                 }
                 WriteState::WaitingChunk => {
                     // length(2) tag(x) + payload(length) tag(x)
-                    let encrypted_payload_length = 2 + me.cipher.tag_len() * 2 + buf.len();
+                    let remaining = buf.len().min(MAX_PAYLOAD_LEN);
+                    buf = &buf[..remaining];
+                    total_buf_len -= remaining;
+                    let encrypted_payload_length = 2 + me.cipher.tag_len() * 2 + remaining;
                     let real_payload_len = buf.len() as u16;
 
                     me.write_buf.reserve(encrypted_payload_length);
@@ -237,6 +241,9 @@ where
                     me.write_buf.clear();
                     let len = *total_len;
                     me.write_state = WriteState::WaitingChunk;
+                    if(total_buf_len != 0) {
+                        continue;
+                    }
                     return Ok(len).into();
                 }
             }
