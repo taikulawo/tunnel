@@ -244,7 +244,7 @@ where
     }
 }
 
-pub struct ShadowDatagram {
+pub struct ShadowsocksDatagram {
     psk: Vec<u8>,
     cipher: AEADCipher,
 }
@@ -255,7 +255,14 @@ pub struct ShadowDatagram {
 //                                        <-target_address || forwarded data->
 // nonce 都从1开始，但由于UDP只使用一次，所以nonce一直都是 1 ？
 // https://github.com/v2fly/v2ray-core/blob/3ef7feaeaf737d05c5a624c580633b7ce0f0f1be/common/crypto/auth.go#L73
-impl ShadowDatagram {
+
+// Since shadowsocks.org offline, I can't found original UDP spec for shadowsocks ever.
+// following spec copy from https://github-wiki-see.page/m/shadowsocks/shadowsocks-org/wiki/AEAD-Ciphers
+// An AEAD encrypted UDP packet has the following structure
+
+// [salt][encrypted payload][tag]
+// The salt is used to derive the per-session subkey and must be generated randomly to ensure uniqueness. Each UDP packet is encrypted/decrypted independently, using the derived subkey and a nonce with all zero byte
+impl ShadowsocksDatagram {
     pub fn new(method: Method, password: &str) -> io::Result<Self> {
         let m = INFOS.get(&method).unwrap();
         let strong_password = password_to_cipher_key(password, m.key_len)?;
@@ -265,9 +272,6 @@ impl ShadowDatagram {
             psk: strong_password,
         })
     }
-
-    // 20220529 shadowsocks.org 一直无法访问
-    // shadowsocks udp 参考 v2ray
     pub fn encrypt(&self, mut buf: BytesMut) -> io::Result<Vec<u8>> {
         // generate salt
         let salt_len = self.cipher.key_len();
@@ -280,7 +284,9 @@ impl ShadowDatagram {
             .cipher
             .encryptor(&self.psk, &encrypted_buf[..salt_len])
             .map_err(|x| map_crypto_error())?;
-        encryptor.encrypt(&mut buf).map_err(|x| map_crypto_error())?;
+        encryptor
+            .encrypt(&mut buf)
+            .map_err(|x| map_crypto_error())?;
         encrypted_buf.extend_from_slice(&buf);
         Ok(encrypted_buf)
     }
@@ -288,14 +294,19 @@ impl ShadowDatagram {
     pub fn decrypt(&self, mut buf: BytesMut) -> io::Result<Vec<u8>> {
         let salt_len = self.cipher.key_len();
         let salt = &buf[..salt_len];
-        let mut decryptor = self.cipher.decryptor(&self.psk, salt).map_err(|x|map_crypto_error())?;
+        let mut decryptor = self
+            .cipher
+            .decryptor(&self.psk, salt)
+            .map_err(|x| map_crypto_error())?;
         let decrypted_data = &mut buf.split_off(salt_len);
         let before_decrpyt_len = decrypted_data.len();
-        decryptor.decrypt(decrypted_data).map_err(|x|map_crypto_error())?;
+        decryptor
+            .decrypt(decrypted_data)
+            .map_err(|x| map_crypto_error())?;
         let valid_data_len = before_decrpyt_len - self.cipher.tag_len();
-        let mut v = Vec::with_capacity(valid_data_len);
-        v.extend_from_slice(&decrypted_data[..valid_data_len]);
-        Ok(v)
+        let mut decrypted_buf = Vec::with_capacity(valid_data_len);
+        decrypted_buf.extend_from_slice(&decrypted_data[..valid_data_len]);
+        Ok(decrypted_buf)
     }
 }
 
