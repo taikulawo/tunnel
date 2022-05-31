@@ -21,7 +21,6 @@ pub fn password_to_cipher_key(password: &str, cipher_len: usize) -> io::Result<V
     Ok(key)
 }
 pub struct CipherInfo {
-    pub name: String,
     pub salt_len: usize,
     pub key_len: usize,
     pub nonce_len: usize,
@@ -30,7 +29,6 @@ pub struct CipherInfo {
 }
 impl CipherInfo {
     pub fn new(
-        name: &str,
         key_len: usize,
         salt_len: usize,
         nonce_len: usize,
@@ -38,7 +36,6 @@ impl CipherInfo {
         algorithm: &'static Algorithm,
     ) -> Self {
         Self {
-            name: name.to_string(),
             key_len,
             salt_len,
             nonce_len,
@@ -59,11 +56,17 @@ impl fmt::Display for Method {
 }
 
 lazy_static! {
-    pub static ref INFOS: HashMap<Method, CipherInfo> = {
+    pub static ref INFOS: HashMap<&'static str, CipherInfo> = {
         let mut m = HashMap::new();
+        // AES-128 in GCM mode with 128-bit tags and 96 bit nonces.
         m.insert(
-            Method::AES_192_GCM,
-            CipherInfo::new("aes-128-gcm", 16, 16, 12, 16, &aead::AES_128_GCM),
+            "aes-128-gcm",
+            CipherInfo::new( 16, 16, 12, 16, &aead::AES_128_GCM),
+        );
+        // AES-256 in GCM mode with 128-bit tags and 96 bit nonces.
+        m.insert(
+            "aes-256-gcm",
+            CipherInfo::new(32, 32, 12, 16, &aead::AES_256_GCM),
         );
         m
     };

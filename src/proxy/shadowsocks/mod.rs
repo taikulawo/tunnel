@@ -30,12 +30,12 @@ enum WriteState {
 }
 // shadowsocks 协议分析
 // https://chaochaogege.com/2022/05/24/58/
-// 针对 0x3fff 的处理我看到的有三种种
-// 1. poll_write 调用只处理 Min(buf.len(), 0x3fff)，并返回consumed的size，caller判断若 consumed < buf.len()，需再次poll_write
-// 2. 从 socket 读取数据时即限制 size，buffer最多只能读取 0x3fff，后续就可不再对 0x3fff 进行处理
-// 3. v2ray 中没搜到 0x3fff，似乎 v2ray 并没处理 0x3fff ??
-
-// 我需要直接将buf一次搞完吗？如果超过 0x3fff，内部loop继续处理，还是和1一样呢？
+// 针对 0x3fff 的处理
+// poll_write 要求返回 how many bytes written，所以caller poll_write之后需将buf切片，未写完的数据继续写
+// ShadowsocksStream 只需要一次处理少于 0x3fff 的数据即可
+//
+// https://github.com/iamwwc/shadowsocks-rust/blob/218c6ec0e302977212ed4f8ec4816337780789aa/crates/shadowsocks/src/relay/tcprelay/proxy_stream/client.rs#L210
+// shadowsocks-rust encrypted poll_write 多次循环全部将数据写完，而不是返回一次最多写入的bytes
 struct ShadowsocksStream<T> {
     stream: T,
     read_buf: BytesMut,
@@ -54,7 +54,10 @@ struct ShadowsocksStream<T> {
 // https://github.com/v2fly/v2ray-core/blob/ca5695244c383870aed1976a59ae6e5eda94f999/proxy/shadowsocks/config.go#L228
 
 impl<T> ShadowsocksStream<T> {
-    pub fn new(stream: T, method: Method, password: String) -> io::Result<Self> {
+    /// method:
+    /// 1. aes-128-gcm
+    /// 2. aes-256-gcm
+    pub fn new(stream: T, method: &str, password: String) -> io::Result<Self> {
         let m = INFOS.get(&method).unwrap();
         let strong_password = password_to_cipher_key(&*password, m.key_len)?;
         let cipher = AEADCipher::new(m.algorithm);
@@ -186,7 +189,7 @@ where
         mut buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
         let me = &mut *self;
-        let mut total_buf_len = buf.len();
+        buf = &buf[..MAX_PAYLOAD_LEN];
         loop {
             match me.write_state {
                 WriteState::WaitingSalt => {
@@ -209,10 +212,7 @@ where
                 }
                 WriteState::WaitingChunk => {
                     // length(2) tag(x) + payload(length) tag(x)
-                    let remaining = buf.len().min(MAX_PAYLOAD_LEN);
-                    buf = &buf[..remaining];
-                    total_buf_len -= remaining;
-                    let encrypted_payload_length = 2 + me.cipher.tag_len() * 2 + remaining;
+                    let encrypted_payload_length = 2 + me.cipher.tag_len() * 2 + buf.len();
                     let real_payload_len = buf.len() as u16;
 
                     me.write_buf.reserve(encrypted_payload_length);
@@ -232,6 +232,7 @@ where
                 }
                 WriteState::WritingChunk(ref mut total_len) => {
                     // write all
+                    // so always return Ok(buf.len())
                     while (*total_len < me.write_buf.len()) {
                         let n =
                             ready!(Pin::new(&mut me.stream)
@@ -239,12 +240,8 @@ where
                         *total_len += n;
                     }
                     me.write_buf.clear();
-                    let len = *total_len;
                     me.write_state = WriteState::WaitingChunk;
-                    if(total_buf_len != 0) {
-                        continue;
-                    }
-                    return Ok(len).into();
+                    return Ok(buf.len()).into();
                 }
             }
         }
@@ -270,7 +267,10 @@ pub struct ShadowsocksDatagram {
 // [salt][encrypted payload][tag]
 // The salt is used to derive the per-session subkey and must be generated randomly to ensure uniqueness. Each UDP packet is encrypted/decrypted independently, using the derived subkey and a nonce with all zero byte
 impl ShadowsocksDatagram {
-    pub fn new(method: Method, password: &str) -> io::Result<Self> {
+    /// method:
+    /// 1. aes-128-gcm
+    /// 2. aes-256-gcm
+    pub fn new(method: & str, password: &str) -> io::Result<Self> {
         let m = INFOS.get(&method).unwrap();
         let strong_password = password_to_cipher_key(password, m.key_len)?;
         let cipher = AEADCipher::new(m.algorithm);
