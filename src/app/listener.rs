@@ -1,15 +1,17 @@
 use futures_util::{future::BoxFuture, FutureExt, StreamExt};
-use log::{error, info};
+use log::{debug, error, info};
 use std::{io::Result, net::SocketAddr, sync::Arc};
 use tokio::{
-    net::{TcpListener, UdpSocket}, sync::oneshot,
+    net::{TcpListener, UdpSocket},
+    sync::oneshot,
 };
 
 use crate::{
+    app::udp_association_manager::UdpPacket,
     proxy::{
-        Address, AnyInboundHandler, InboundResult, Network, Session,
-        TcpInboundHandlerTrait, UdpInboundHandlerTrait,
-    }, app::udp_association_manager::UdpPacket,
+        Address, AnyInboundHandler, InboundResult, Network, Session, TcpInboundHandlerTrait,
+        UdpInboundHandlerTrait,
+    },
 };
 
 use super::{dispatcher::Dispatcher, UdpAssociationManager};
@@ -34,13 +36,11 @@ impl InboundListener {
             // 2. tcp_listener 不能依赖self，listen调用 dispatcher.clone() 后将 cloned dispatcher 传给 tcp_listener
             // 这就要求 tcp_listener 改为 InboundListener
             // 实在不想在 listen 糅合一堆代码，我在这里采用 2
-            let f =
-                InboundListener::tcp_listener(handler.clone(), dispatcher.clone(), addr);
+            let f = InboundListener::tcp_listener(handler.clone(), dispatcher.clone(), addr);
             tasks.push(f);
         }
         if handler.has_udp() {
-            let f =
-                InboundListener::udp_listener(handler.clone(), dispatcher.clone(), addr, nat);
+            let f = InboundListener::udp_listener(handler.clone(), dispatcher.clone(), addr, nat);
             tasks.push(f);
         }
         Ok(tasks)
@@ -65,7 +65,7 @@ impl InboundListener {
                                 destination: Address::Ip(addr),
                                 network: Network::TCP,
                                 local_peer: local,
-                                peer_address: conn.peer_addr().expect("peer")
+                                peer_address: conn.peer_addr().expect("peer"),
                             };
                             match TcpInboundHandlerTrait::handle(&*handler, session, conn).await {
                                 Ok(InboundResult::Stream(stream, mut sess)) => {
@@ -88,9 +88,9 @@ impl InboundListener {
                         return;
                     }
                 }
-
             }
-        }.boxed();
+        }
+        .boxed();
         task
     }
     fn udp_listener(
@@ -102,51 +102,68 @@ impl InboundListener {
         let future = async move {
             let socket = UdpSocket::bind(addr).await.unwrap();
             info!("Udp listening at {}", addr);
-            let mut buf = [0u8; 1024];
             match UdpInboundHandlerTrait::handle(handler.as_ref(), socket).await {
                 Ok(res) => {
                     match res {
                         InboundResult::Datagram(send_recv_socket) => {
                             tokio::spawn(async move {
                                 let mut buf = vec![0u8; 1024];
-                                let (source_addr, real_addr) = match send_recv_socket.recv_from(&mut buf).await {
-                                    Ok(x) => x,
-                                    Err(err) => {
-                                        return
+                                let (source_addr, real_addr) =
+                                    match send_recv_socket.recv_from(&mut buf).await {
+                                        Ok(x) => x,
+                                        Err(err) => {
+                                            debug!("{}", err);
+                                            return;
+                                        }
+                                    };
+                                let (mut sender, mut receiver) =
+                                    tokio::sync::mpsc::channel::<Vec<u8>>(10);
+                                let send_recv_socket1 = send_recv_socket.clone();
+                                tokio::spawn(async move {
+                                    loop {
+                                        let res = match receiver.recv().await {
+                                            Some(x) => x,
+                                            None => {
+                                                // closed
+                                                debug!("{} closed channel", &source_addr);
+                                                return;
+                                            }
+                                        };
+                                        match send_recv_socket1
+                                            .send_to(res.as_ref(), source_addr.clone())
+                                            .await
+                                        {
+                                            Ok(_) => {}
+                                            Err(err) => {
+                                                debug!("{}", err);
+                                                return;
+                                            }
+                                        }
                                     }
-                                };
-                                let (sender, receiver) = tokio::sync::mpsc::channel(10);
-                                let sess = Session {
-                                    destination: real_addr.clone(), 
-                                    local_peer: addr, 
-                                    peer_address: source_addr, 
-                                    network: Network::UDP 
-                                };
-                                let packet = UdpPacket{
+                                });
+                                let packet = UdpPacket {
                                     data: buf,
-                                    dest: real_addr.clone()
+                                    dest: real_addr.clone(),
                                 };
-                                nat.send_packet(real_addr, source_addr,packet, sender);
-                                // dispatcher.dispatch_udp(sess).await;
+                                match nat
+                                    .send_packet(real_addr, source_addr, packet, sender)
+                                    .await
+                                {
+                                    Ok(_) => {}
+                                    Err(err) => {
+                                        debug!("{}", err);
+                                    }
+                                }
                             });
-                            // tokio::spawn(async {
-                            //     let x = match send_recv_socket.send_to(buf, dest)
-                            // })
-                            // recv buf from local socket, send it to remote through dispatcher
                         }
-                        InboundResult::Stream(stream, sess) => {
-
-                        }
-                        InboundResult::NotSupported => {
-
-                        }
+                        InboundResult::Stream(stream, sess) => {}
+                        InboundResult::NotSupported => {}
                     }
                 }
-                Err(err) => {
-
-                }
+                Err(err) => {}
             }
-        }.boxed();
+        }
+        .boxed();
         future
     }
 }
