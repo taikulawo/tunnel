@@ -13,15 +13,16 @@ use crate::{
     },
 };
 
-use super::{Dispatcher, InboundListener};
+use super::{Dispatcher, InboundListener, UdpAssociationManager};
 // 统一管理全部 inbound 协议
 pub struct InboundManager {
     handlers: HashMap<String, Arc<InboundHandler>>,
     configs: Vec<Inbound>,
+    nat: Arc<UdpAssociationManager>,
 }
 
 impl InboundManager {
-    pub fn new(config: Vec<Inbound>) -> InboundManager {
+    pub fn new(config: Vec<Inbound>, nat: Arc<UdpAssociationManager>) -> InboundManager {
         let mut handlers: HashMap<String, Arc<InboundHandler>> = HashMap::new();
 
         // 迭代全部的inbound协议，并创建listener
@@ -42,6 +43,7 @@ impl InboundManager {
         InboundManager {
             handlers,
             configs: config,
+            nat
         }
     }
     pub fn listen(mut self, dispatcher: Arc<Dispatcher>) -> Result<BoxFuture<'static, ()>> {
@@ -63,7 +65,7 @@ impl InboundManager {
                                 continue;
                             }
                         };
-                        InboundListener::listen(dispatcher, handler.clone(), addr)?
+                        InboundListener::listen(dispatcher, handler.clone(), addr, self.nat.clone())?
                     }
                 };
                 tasks.append(&mut future);

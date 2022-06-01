@@ -16,7 +16,7 @@ use tokio::{
     net::{TcpSocket, UdpSocket, TcpStream}, sync::RwLock,
 };
 
-use crate::{app::DnsClient, Context};
+use crate::{app::DnsClient, Context, common::UNKNOWN_SOCKET_ADDR};
 
 #[cfg(target_os = "unix")]
 mod tun;
@@ -58,6 +58,12 @@ impl Address {
     }
 }
 
+
+impl Default for Address {
+    fn default() -> Self {
+        Address::Ip(*UNKNOWN_SOCKET_ADDR)
+    }
+}
 
 impl Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -120,6 +126,16 @@ pub struct Session {
     
     pub network: Network
 }
+impl Default for Session {
+    fn default() -> Self {
+        Self {
+            local_peer: *UNKNOWN_SOCKET_ADDR,
+            network: Network::TCP,
+            peer_address: *UNKNOWN_SOCKET_ADDR,
+            .. Default::default()
+        }
+    }
+}
 impl Session {
     pub fn port (&self) -> u16{
         match self.destination {
@@ -167,15 +183,15 @@ pub fn create_bounded_tcp_socket(addr: SocketAddr) -> io::Result<TcpSocket> {
 
 #[async_trait]
 pub trait InboundDatagramTrait: Sync + Send + Unpin{
-    async fn send_to(&self, buf: Vec<u8>, dest: SocketAddr) -> io::Result<usize>;
     // buf, source addr, real socket addr
-    async fn recv_from(&self) -> io::Result<(Vec<u8>,SocketAddr, Address)>;
+    async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(SocketAddr, Address)>;
+    async fn send_to(&self, buf: &[u8], dest: SocketAddr) -> io::Result<usize>;
 }
 
 #[async_trait]
 pub trait OutboundDatagramTrait: Sync + Send + Unpin {
-    async fn send_to(&self, buf: Vec<u8>, dest: SocketAddr) -> io::Result<usize>;
-    async fn recv_from(&self) -> io::Result<(Vec<u8>, SocketAddr)>;
+    async fn send_to(&self, buf: &[u8], dest: Address) -> io::Result<usize>;
+    async fn recv_from(&self, buf: &mut [u8]) -> io::Result<Address>;
 }
 pub struct SimpleOutboundSocket {
     socket: UdpSocket
@@ -190,13 +206,18 @@ impl From<UdpSocket> for SimpleOutboundSocket {
 
 #[async_trait]
 impl OutboundDatagramTrait for SimpleOutboundSocket {
-    async fn recv_from(&self) -> io::Result<(Vec<u8>, SocketAddr)> {
-        let mut buf = [0u8; 1024];
+    async fn recv_from(&self, mut buf: &mut [u8]) -> io::Result<Address> {
         let (n, dest) = self.socket.recv_from(&mut buf).await?;
-        Ok((buf[..n].to_vec(), dest))
+        Ok(Address::Ip(dest))
     }
-    async fn send_to(&self, buf: Vec<u8>, dest: SocketAddr) -> io::Result<usize> {
-        self.socket.send_to(buf.as_ref(), dest).await
+    async fn send_to(&self, buf: &[u8], dest: Address) -> io::Result<usize> {
+        let addr = match dest {
+            Address::Ip(x) =>x,
+            _ => {
+                return Err(io::Error::new(io::ErrorKind::Other, "simple datagram destination shouldn't be domain name"));
+            }
+        };
+        self.socket.send_to(buf.as_ref(), addr).await
     }
 }
 

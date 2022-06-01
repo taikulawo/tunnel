@@ -54,7 +54,7 @@ struct Socks5Datagram {
 
 #[async_trait]
 impl InboundDatagramTrait for Socks5Datagram {
-    async fn recv_from(&self) ->io::Result<(Vec<u8> ,SocketAddr, Address)>  {
+    async fn recv_from(&self, buf: &mut [u8]) ->io::Result<(SocketAddr, Address)>  {
         let mut buf = vec![0u8; 1024];
         match self.socket.recv_from(&mut buf).await {
             Ok((n, source_addr)) => {
@@ -66,7 +66,7 @@ impl InboundDatagramTrait for Socks5Datagram {
         }
         todo!()
     }
-    async fn send_to(&self, buf: Vec<u8>, dest: SocketAddr) ->io::Result<usize>  {
+    async fn send_to(&self, buf: &[u8], dest: SocketAddr) ->io::Result<usize>  {
         match self.socket.send_to(&buf, dest).await {
             Ok(n) => {
 

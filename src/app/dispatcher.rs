@@ -1,5 +1,8 @@
-use std::{convert::TryFrom, sync::Arc, net::SocketAddr};
+use std::{convert::TryFrom, sync::Arc, net::SocketAddr, io};
 
+use anyhow::{
+    anyhow
+};
 use log::{debug, error, trace};
 use tokio::{
     net::{TcpStream, UdpSocket},
@@ -8,11 +11,11 @@ use tokio::{
 
 use crate::{
     config::Config,
-    proxy::{Address, Session, StreamWrapperTrait, TcpOutboundHandlerTrait, InboundDatagramTrait, AnyInboundDatagram, UdpOutboundHandlerTrait},
+    proxy::{Address, Session, StreamWrapperTrait, TcpOutboundHandlerTrait, InboundDatagramTrait, AnyInboundDatagram, UdpOutboundHandlerTrait, AnyOutboundDatagram},
     Context,
 };
 
-use super::{sniffer::Sniffer, DnsClient, OutboundManager, Router};
+use super::{sniffer::Sniffer, DnsClient, OutboundManager, Router, udp_association_manager::UdpAssociationManager};
 
 // 负责将请求分发给不同的 代理协议 处理
 pub struct Dispatcher {
@@ -115,29 +118,20 @@ impl Dispatcher {
         };
     }
 
-    pub async fn dispatch_udp(&self, socket: AnyInboundDatagram, sess: Session) {
+    pub async fn dispatch_udp(&self, sess: Session) -> anyhow::Result<AnyOutboundDatagram>{
         let outbound_tag = match self.router.route(&sess) {
             Some(x) => x,
             None => {
-                debug!("no outbound found for {:?}", &sess);
-                return;
+                return Err(anyhow!("no outbound found for {}", &sess.destination));
             }
         };
         let handler = match self.outbound_manager.get_handler(outbound_tag.as_ref()) {
             Some(h) => h,
             None => {
-                debug!("no handler found for tag {}", &*outbound_tag);
-                return;
+                return Err(anyhow!("no handler found for tag {}", &*outbound_tag))
             }
         };
-        match UdpOutboundHandlerTrait::handle(handler.as_ref(), self.ctx.clone(), &sess).await {
-            Ok(socket) => {
-
-            }
-            Err(err) => {
-
-            }
-        }
+        UdpOutboundHandlerTrait::handle(handler.as_ref(), self.ctx.clone(), &sess).await
     }
 
     pub fn new(
@@ -151,7 +145,7 @@ impl Dispatcher {
             ctx: context,
             dns_client,
             outbound_manager: outbound_manager,
-            router,
+            router
         }
     }
 }

@@ -2,17 +2,17 @@ use futures_util::{future::BoxFuture, FutureExt, StreamExt};
 use log::{error, info};
 use std::{io::Result, net::SocketAddr, sync::Arc};
 use tokio::{
-    net::{TcpListener, UdpSocket},
+    net::{TcpListener, UdpSocket}, sync::oneshot,
 };
 
 use crate::{
     proxy::{
         Address, AnyInboundHandler, InboundResult, Network, Session,
         TcpInboundHandlerTrait, UdpInboundHandlerTrait,
-    },
+    }, app::udp_association_manager::UdpPacket,
 };
 
-use super::dispatcher::Dispatcher;
+use super::{dispatcher::Dispatcher, UdpAssociationManager};
 
 pub struct InboundListener {}
 type TaskFuture = BoxFuture<'static, ()>;
@@ -21,6 +21,7 @@ impl InboundListener {
         dispatcher: Arc<Dispatcher>,
         handler: AnyInboundHandler,
         addr: SocketAddr,
+        nat: Arc<UdpAssociationManager>,
     ) -> Result<Vec<TaskFuture>> {
         let mut tasks: Vec<TaskFuture> = vec![];
         if handler.has_tcp() {
@@ -39,7 +40,7 @@ impl InboundListener {
         }
         if handler.has_udp() {
             let f =
-                InboundListener::udp_listener(handler.clone(), dispatcher.clone(), addr);
+                InboundListener::udp_listener(handler.clone(), dispatcher.clone(), addr, nat);
             tasks.push(f);
         }
         Ok(tasks)
@@ -96,29 +97,37 @@ impl InboundListener {
         handler: AnyInboundHandler,
         dispatcher: Arc<Dispatcher>,
         addr: SocketAddr,
+        nat: Arc<UdpAssociationManager>,
     ) -> TaskFuture {
         let future = async move {
             let socket = UdpSocket::bind(addr).await.unwrap();
-            info!("Udp listen at {}", addr);
+            info!("Udp listening at {}", addr);
             let mut buf = [0u8; 1024];
             match UdpInboundHandlerTrait::handle(handler.as_ref(), socket).await {
                 Ok(res) => {
                     match res {
                         InboundResult::Datagram(send_recv_socket) => {
                             tokio::spawn(async move {
-                                let (buf, source_addr, real_addr) = match send_recv_socket.recv_from().await {
+                                let mut buf = vec![0u8; 1024];
+                                let (source_addr, real_addr) = match send_recv_socket.recv_from(&mut buf).await {
                                     Ok(x) => x,
                                     Err(err) => {
                                         return
                                     }
                                 };
+                                let (sender, receiver) = tokio::sync::mpsc::channel(10);
                                 let sess = Session {
-                                    destination: real_addr, 
+                                    destination: real_addr.clone(), 
                                     local_peer: addr, 
                                     peer_address: source_addr, 
                                     network: Network::UDP 
                                 };
-                                dispatcher.dispatch_udp(send_recv_socket, sess).await;
+                                let packet = UdpPacket{
+                                    data: buf,
+                                    dest: real_addr.clone()
+                                };
+                                nat.send_packet(real_addr, source_addr,packet, sender);
+                                // dispatcher.dispatch_udp(sess).await;
                             });
                             // tokio::spawn(async {
                             //     let x = match send_recv_socket.send_to(buf, dest)

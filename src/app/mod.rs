@@ -23,3 +23,6 @@ pub use sniffer::Sniffer;
 
 mod router;
 pub use router::Router;
+
+mod udp_association_manager;
+pub use self::udp_association_manager::UdpAssociationManager;
