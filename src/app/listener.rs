@@ -8,7 +8,7 @@ use tokio::{
 use crate::{
     proxy::{
         Address, AnyInboundHandler, InboundResult, Network, Session,
-        TcpInboundHandlerTrait,
+        TcpInboundHandlerTrait, UdpInboundHandlerTrait,
     },
 };
 
@@ -70,10 +70,10 @@ impl InboundListener {
                                 Ok(InboundResult::Stream(stream, mut sess)) => {
                                     dispatcher.dispatch_tcp(stream, &mut sess).await;
                                 }
-                                Ok(InboundResult::Datagram(socket, sess)) => {
-                                    dispatcher.dispatch_udp(socket, sess).await;
+                                Ok(InboundResult::Datagram(socket)) => {
+                                    // dispatcher.dispatch_udp(socket, sess).await;
                                 }
-                                Ok(InboundResult::NOT_SUPPORTED) => {
+                                Ok(InboundResult::NotSupported) => {
                                     error!("not supported");
                                 }
                                 Err(err) => {
@@ -93,16 +93,51 @@ impl InboundListener {
         task
     }
     fn udp_listener(
-        _handler: AnyInboundHandler,
-        _dispatcher: Arc<Dispatcher>,
+        handler: AnyInboundHandler,
+        dispatcher: Arc<Dispatcher>,
         addr: SocketAddr,
     ) -> TaskFuture {
         let future = async move {
-            let _listener = UdpSocket::bind(addr).await.unwrap();
+            let socket = UdpSocket::bind(addr).await.unwrap();
             info!("Udp listen at {}", addr);
-            ()
+            let mut buf = [0u8; 1024];
+            match UdpInboundHandlerTrait::handle(handler.as_ref(), socket).await {
+                Ok(res) => {
+                    match res {
+                        InboundResult::Datagram(send_recv_socket) => {
+                            tokio::spawn(async move {
+                                let (buf, source_addr, real_addr) = match send_recv_socket.recv_from().await {
+                                    Ok(x) => x,
+                                    Err(err) => {
+                                        return
+                                    }
+                                };
+                                let sess = Session {
+                                    destination: real_addr, 
+                                    local_peer: addr, 
+                                    peer_address: source_addr, 
+                                    network: Network::UDP 
+                                };
+                                dispatcher.dispatch_udp(send_recv_socket, sess).await;
+                            });
+                            // tokio::spawn(async {
+                            //     let x = match send_recv_socket.send_to(buf, dest)
+                            // })
+                            // recv buf from local socket, send it to remote through dispatcher
+                        }
+                        InboundResult::Stream(stream, sess) => {
+
+                        }
+                        InboundResult::NotSupported => {
+
+                        }
+                    }
+                }
+                Err(err) => {
+
+                }
+            }
         }.boxed();
-        // todo!("udp listener")
         future
     }
 }

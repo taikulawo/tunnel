@@ -8,7 +8,7 @@ use tokio::{
 
 use crate::{
     config::Config,
-    proxy::{Address, Session, StreamWrapperTrait, TcpOutboundHandlerTrait},
+    proxy::{Address, Session, StreamWrapperTrait, TcpOutboundHandlerTrait, InboundDatagramTrait, AnyInboundDatagram, UdpOutboundHandlerTrait},
     Context,
 };
 
@@ -115,7 +115,30 @@ impl Dispatcher {
         };
     }
 
-    pub async fn dispatch_udp(&self, _socket: UdpSocket, _sess: Session) {}
+    pub async fn dispatch_udp(&self, socket: AnyInboundDatagram, sess: Session) {
+        let outbound_tag = match self.router.route(&sess) {
+            Some(x) => x,
+            None => {
+                debug!("no outbound found for {:?}", &sess);
+                return;
+            }
+        };
+        let handler = match self.outbound_manager.get_handler(outbound_tag.as_ref()) {
+            Some(h) => h,
+            None => {
+                debug!("no handler found for tag {}", &*outbound_tag);
+                return;
+            }
+        };
+        match UdpOutboundHandlerTrait::handle(handler.as_ref(), self.ctx.clone(), &sess).await {
+            Ok(socket) => {
+
+            }
+            Err(err) => {
+
+            }
+        }
+    }
 
     pub fn new(
         context: Arc<Context>,

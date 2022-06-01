@@ -112,6 +112,7 @@ pub struct Session {
     // 真正要连接的 remote
     pub destination: Address,
     // 连接到本地代理服务器的remote
+    // listen之后socket#local_addr()
     // local_peer <=> tunnel
     pub local_peer: SocketAddr,
     // 连接到本地的对端socket
@@ -128,13 +129,13 @@ impl Session {
     }
 }
 
-pub fn create_bounded_udp_socket(addr: IpAddr) -> io::Result<UdpSocket> {
+pub fn create_bounded_udp_socket(addr: SocketAddr) -> io::Result<UdpSocket> {
     let socket = match addr {
-        IpAddr::V4(..) => Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?,
-        IpAddr::V6(..) => Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?,
+        SocketAddr::V4(..) => Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?,
+        SocketAddr::V6(..) => Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?,
     };
     // let s: SockAddr = ;
-    match socket.bind(&SockAddr::from(SocketAddr::new(addr, 0))) {
+    match socket.bind(&addr.into()) {
         Ok(..) => {},
         Err(err) => {
             log::error!("failed to bind socket {}", err.to_string())
@@ -163,10 +164,49 @@ pub fn create_bounded_tcp_socket(addr: SocketAddr) -> io::Result<TcpSocket> {
 
 // ----------------------------
 // INBOUND
+
+#[async_trait]
+pub trait InboundDatagramTrait: Sync + Send + Unpin{
+    async fn send_to(&self, buf: Vec<u8>, dest: SocketAddr) -> io::Result<usize>;
+    // buf, source addr, real socket addr
+    async fn recv_from(&self) -> io::Result<(Vec<u8>,SocketAddr, Address)>;
+}
+
+#[async_trait]
+pub trait OutboundDatagramTrait: Sync + Send + Unpin {
+    async fn send_to(&self, buf: Vec<u8>, dest: SocketAddr) -> io::Result<usize>;
+    async fn recv_from(&self) -> io::Result<(Vec<u8>, SocketAddr)>;
+}
+pub struct SimpleOutboundSocket {
+    socket: UdpSocket
+}
+impl From<UdpSocket> for SimpleOutboundSocket {
+    fn from(socket: UdpSocket) -> Self {
+        Self {
+            socket
+        }
+    }
+}
+
+#[async_trait]
+impl OutboundDatagramTrait for SimpleOutboundSocket {
+    async fn recv_from(&self) -> io::Result<(Vec<u8>, SocketAddr)> {
+        let mut buf = [0u8; 1024];
+        let (n, dest) = self.socket.recv_from(&mut buf).await?;
+        Ok((buf[..n].to_vec(), dest))
+    }
+    async fn send_to(&self, buf: Vec<u8>, dest: SocketAddr) -> io::Result<usize> {
+        self.socket.send_to(buf.as_ref(), dest).await
+    }
+}
+
+
+pub type AnyInboundDatagram = Arc<dyn InboundDatagramTrait>;
+pub type AnyOutboundDatagram = Arc<dyn OutboundDatagramTrait>;
 pub enum InboundResult {
     Stream(TcpStream, Session),
-    Datagram(UdpSocket, Session),
-    NOT_SUPPORTED
+    Datagram(AnyInboundDatagram),
+    NotSupported
 }
 
 pub type AnyTcpInboundHandler = Arc<dyn TcpInboundHandlerTrait>;
@@ -198,16 +238,16 @@ impl TcpInboundHandlerTrait for InboundHandler {
         if let Some(handler) = &self.tcp_handler {
             return handler.handle(sess, stream).await;
         }
-        Ok(InboundResult::NOT_SUPPORTED)
+        Ok(InboundResult::NotSupported)
     }
 }
 #[async_trait]
 impl UdpInboundHandlerTrait for InboundHandler {
-    async fn handle(&self, sess: Session, socket: UdpSocket) -> io::Result<InboundResult> {
+    async fn handle(&self, socket: UdpSocket) -> io::Result<InboundResult> {
         if let Some(handler) = &self.udp_handler {
-            return handler.handle(sess, socket).await;
+            return handler.handle(socket).await;
         }
-        Ok(InboundResult::NOT_SUPPORTED)
+        Ok(InboundResult::NotSupported)
     }
 }
 
@@ -229,7 +269,7 @@ pub trait TcpInboundHandlerTrait: Sync + Send + Unpin {
 
 #[async_trait]
 pub trait UdpInboundHandlerTrait: Sync + Send + Unpin {
-    async fn handle(&self, session: Session, socket: tokio::net::UdpSocket) -> io::Result<InboundResult>;
+    async fn handle(&self, socket: tokio::net::UdpSocket) -> io::Result<InboundResult>;
 }
 
 // OUTBOUND
@@ -260,7 +300,7 @@ pub enum Error {
 
 #[async_trait]
 pub trait UdpOutboundHandlerTrait: Send + Sync + Unpin {
-    async fn handle(&self, ctx: Arc<Context>, sess: &Session) -> anyhow::Result<UdpSocket>;
+    async fn handle(&self, ctx: Arc<Context>, sess: &Session) -> anyhow::Result<AnyOutboundDatagram>;
 }
 
 pub type AnyTcpOutboundHandler = Arc<dyn TcpOutboundHandlerTrait>;
@@ -279,6 +319,20 @@ impl OutboundHandler {
         OutboundHandler { tag , tcp_handler: tcp, udp_handler: udp }
     }
 }
+#[async_trait]
+impl UdpOutboundHandlerTrait for OutboundHandler {
+    async fn handle(&self, ctx: Arc<Context>, sess: &Session) -> anyhow::Result<AnyOutboundDatagram> {
+
+        todo!()
+    }
+}
+
+#[async_trait]
+impl TcpOutboundHandlerTrait for OutboundHandler {
+    async fn handle(&self, ctx: Arc<Context>, sess: &Session) -> anyhow::Result<TcpStream> {
+        todo!()
+    }
+}
 
 pub trait StreamWrapperTrait: AsyncRead + AsyncWrite + Send + Sync + Unpin{}
 impl<T> StreamWrapperTrait for T where T: AsyncRead + AsyncWrite + Send + Sync + Unpin {}
@@ -291,6 +345,13 @@ pub async fn connect_to_remote_tcp(dns_client:Arc<RwLock<DnsClient>>, addr: Addr
         debug!("error when connect to {}, error {}", socket_addr, err);
         Err(err.into())
     })
+}
+pub async fn connect_to_remote_udp(dns_client: Arc<RwLock<DnsClient>>, source_addr: SocketAddr) -> anyhow::Result<UdpSocket> {
+    let any_addr = match source_addr {
+        SocketAddr::V4(_) => "0.0.0.0:0".parse::<SocketAddr>().unwrap(),
+        SocketAddr::V6(_) => "[::]:0".parse::<SocketAddr>().unwrap(),
+    };
+    create_bounded_udp_socket(any_addr).map_err(|x|anyhow!("create bounded udp socket failed"))
 }
 
 pub async fn name_to_socket_addr(dns_client: Arc<RwLock<DnsClient>>, addr: Address) -> anyhow::Result<SocketAddr> {
@@ -314,11 +375,4 @@ pub async fn name_to_socket_addr(dns_client: Arc<RwLock<DnsClient>>, addr: Addre
         Address::Ip(addr) => addr
     };
     Ok(socket_addr)
-}
-
-pub async fn connect_to_remote_udp(dns_client: Arc<RwLock<DnsClient>>, local: SocketAddr, peer: Address) -> anyhow::Result<UdpSocket> {
-    let socket = UdpSocket::bind(local).await?;
-    let socket_addr = name_to_socket_addr(dns_client, peer).await?;
-    UdpSocket::connect(&socket, socket_addr).await?;
-    Ok(socket)
 }

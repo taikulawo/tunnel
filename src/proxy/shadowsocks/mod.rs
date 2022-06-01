@@ -259,6 +259,7 @@ pub struct ShadowsocksDatagram {
 //                                        <-target_address || forwarded data->
 // nonce 都从1开始，但由于UDP只使用一次，所以nonce一直都是 1 ？
 // https://github.com/v2fly/v2ray-core/blob/3ef7feaeaf737d05c5a624c580633b7ce0f0f1be/common/crypto/auth.go#L73
+// 不过也没关系了，毕竟每次salt都是随机的
 
 // Since shadowsocks.org offline, I can't found original UDP spec for shadowsocks ever.
 // following spec copy from https://github-wiki-see.page/m/shadowsocks/shadowsocks-org/wiki/AEAD-Ciphers
