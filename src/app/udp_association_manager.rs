@@ -61,10 +61,11 @@ impl UdpAssociationManager {
         let socket1 = socket.clone();
         tokio::spawn(async move {
             loop {
+                // inbound -> send -> tunnel -> recv -> outbound
                 match remote_socket_receiver.recv().await {
                     Some(msg) => {
-                        let UdpPacket { data, dest } = msg;
-                        match socket1.send_to(data.as_ref(), dest).await {
+                        let UdpPacket { ref data, dest } = msg;
+                        match socket1.send_to(data, dest).await {
                             Ok(res) => {}
                             Err(err) => {
                                 debug!("{}", err)
@@ -81,6 +82,7 @@ impl UdpAssociationManager {
         });
         let socket2 = socket.clone();
         tokio::spawn(async move {
+            // inbound <- send <- tunnel <- recv <- outbound
             let mut buf = vec![0u8; 1024];
             loop {
                 match socket2.recv_from(&mut buf).await {
@@ -110,6 +112,7 @@ impl UdpAssociationManager {
         };
         let sender = sender.clone();
         tokio::spawn(async move {
+            // inbound -> send -> tunnel -> recv -> outbound
             match sender.try_send(packet) {
                 Ok(_) => {}
                 Err(err) => {

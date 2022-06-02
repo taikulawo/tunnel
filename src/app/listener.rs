@@ -116,10 +116,11 @@ impl InboundListener {
                                             return;
                                         }
                                     };
-                                let (mut sender, mut receiver) =
-                                    tokio::sync::mpsc::channel::<Vec<u8>>(10);
+                                let (sender, mut receiver) =
+                                    tokio::sync::mpsc::channel::<Vec<u8>>(100);
                                 let send_recv_socket1 = send_recv_socket.clone();
                                 tokio::spawn(async move {
+                                    // inbound <- send <- tunnel <- recv <- outbound
                                     loop {
                                         let res = match receiver.recv().await {
                                             Some(x) => x,
@@ -130,7 +131,7 @@ impl InboundListener {
                                             }
                                         };
                                         match send_recv_socket1
-                                            .send_to(res.as_ref(), source_addr.clone())
+                                        .send_to(res.as_ref(), source_addr.clone())
                                             .await
                                         {
                                             Ok(_) => {}

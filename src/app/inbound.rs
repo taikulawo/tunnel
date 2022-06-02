@@ -73,7 +73,6 @@ impl InboundManager {
         }
         Ok(async {
             futures::future::join_all(tasks).await;
-            let a = 1;
         }.boxed())
     }
 }
