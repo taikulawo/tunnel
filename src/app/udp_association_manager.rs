@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io, net::SocketAddr, sync::Arc};
 
-use log::{debug, error};
+use log::{debug, error, trace};
 use tokio::sync::{
     mpsc::{self, Sender},
     Mutex,
@@ -93,7 +93,9 @@ impl UdpAssociationManager {
                             return;
                         }
                     },
-                    Err(err) => {}
+                    Err(err) => {
+                        trace!("{}", err);
+                    }
                 }
             }
         });
