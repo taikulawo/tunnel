@@ -7,7 +7,7 @@ use tokio::{net::{TcpStream, UdpSocket}};
 use crate::{
     proxy::{
         connect_to_remote_tcp, Address, Session, TcpOutboundHandlerTrait,
-        UdpOutboundHandlerTrait,
+        UdpOutboundHandlerTrait, AnyInboundDatagram, AnyOutboundDatagram,
     },
     Context,
 };
@@ -40,7 +40,7 @@ pub struct UdpOutboundHandler {
 
 #[async_trait]
 impl UdpOutboundHandlerTrait for UdpOutboundHandler {
-    async fn handle(&self, _ctx: Arc<Context>, _session: &Session) -> anyhow::Result<UdpSocket> {
+    async fn handle(&self, _ctx: Arc<Context>, _session: &Session) -> anyhow::Result<AnyOutboundDatagram> {
         todo!()
     }
 }

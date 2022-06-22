@@ -1,10 +1,10 @@
 use log::error;
-use std::io;
+use std::{io, net::SocketAddr, sync::Arc};
 
 use crate::{
     proxy::{
         socks::handshake_as_server, Session, InboundResult, TcpInboundHandlerTrait,
-        UdpInboundHandlerTrait,
+        UdpInboundHandlerTrait, InboundDatagramTrait, Address,
     },
 };
 use async_trait::async_trait;
@@ -30,7 +30,7 @@ pub struct UdpInboundHandler;
 
 #[async_trait]
 impl UdpInboundHandlerTrait for UdpInboundHandler {
-    async fn handle(&self, conn: Session, socket: UdpSocket) -> io::Result<InboundResult> {
+    async fn handle(&self, socket: UdpSocket) -> io::Result<InboundResult> {
         // socks5 对 udp 会有单独的连接流程
         // 由于 udp 的connectionless 特性，所以 client 只发送一次，header， data 都包含在其中
         // https://datatracker.ietf.org/doc/html/rfc1928#section-7
@@ -41,6 +41,40 @@ impl UdpInboundHandlerTrait for UdpInboundHandler {
         // does not support fragmentation MUST drop any datagram whose FRAG
         // field is other than X'00'.
         // https://github.com/iamwwc/v2ray-core/blob/02f251ebecbf21095c7b74cb3f0feaed0927d3f9/proxy/socks/protocol.go#L321
-        Ok(InboundResult::Datagram(socket, conn))
+        let udp = Socks5Datagram {
+            socket
+        };
+        Ok(InboundResult::Datagram(Arc::new(udp)))
+    }
+}
+
+struct Socks5Datagram {
+    socket: UdpSocket
+}
+
+#[async_trait]
+impl InboundDatagramTrait for Socks5Datagram {
+    async fn recv_from(&self, buf: &mut [u8]) ->io::Result<(SocketAddr, Address)>  {
+        let mut buf = vec![0u8; 1024];
+        match self.socket.recv_from(&mut buf).await {
+            Ok((n, source_addr)) => {
+
+            },
+            Err(err) => {
+
+            }
+        }
+        todo!()
+    }
+    async fn send_to(&self, buf: &[u8], dest: SocketAddr) ->io::Result<usize>  {
+        match self.socket.send_to(&buf, dest).await {
+            Ok(n) => {
+
+            }
+            Err(err) => {
+
+            }
+        }
+        todo!()
     }
 }

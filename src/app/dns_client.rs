@@ -136,12 +136,12 @@ impl DnsClient {
             SocketAddr::V4(_v4) => {
                 // let bind_addr = get_default_ipv4_gateway()?;
                 let bind_addr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
-                create_bounded_udp_socket(bind_addr)?
+                create_bounded_udp_socket(SocketAddr::new(bind_addr, 0))?
             }
             SocketAddr::V6(_v6) => {
                 // let bind_addr = get_default_ipv6_gateway()?;
                 let bind_addr = IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0));
-                create_bounded_udp_socket(bind_addr)?
+                create_bounded_udp_socket(SocketAddr::new(bind_addr, 0))?
             }
         };
         match socket.send_to(&*request, server).await {

@@ -1,18 +1,20 @@
 use futures_util::{future::BoxFuture, FutureExt, StreamExt};
-use log::{error, info};
+use log::{debug, error, info};
 use std::{io::Result, net::SocketAddr, sync::Arc};
 use tokio::{
     net::{TcpListener, UdpSocket},
+    sync::oneshot,
 };
 
 use crate::{
+    app::udp_association_manager::UdpPacket,
     proxy::{
-        Address, AnyInboundHandler, InboundResult, Network, Session,
-        TcpInboundHandlerTrait,
+        Address, AnyInboundHandler, InboundResult, Network, Session, TcpInboundHandlerTrait,
+        UdpInboundHandlerTrait,
     },
 };
 
-use super::dispatcher::Dispatcher;
+use super::{dispatcher::Dispatcher, UdpAssociationManager};
 
 pub struct InboundListener {}
 type TaskFuture = BoxFuture<'static, ()>;
@@ -21,6 +23,7 @@ impl InboundListener {
         dispatcher: Arc<Dispatcher>,
         handler: AnyInboundHandler,
         addr: SocketAddr,
+        nat: Arc<UdpAssociationManager>,
     ) -> Result<Vec<TaskFuture>> {
         let mut tasks: Vec<TaskFuture> = vec![];
         if handler.has_tcp() {
@@ -33,13 +36,11 @@ impl InboundListener {
             // 2. tcp_listener 不能依赖self，listen调用 dispatcher.clone() 后将 cloned dispatcher 传给 tcp_listener
             // 这就要求 tcp_listener 改为 InboundListener
             // 实在不想在 listen 糅合一堆代码，我在这里采用 2
-            let f =
-                InboundListener::tcp_listener(handler.clone(), dispatcher.clone(), addr);
+            let f = InboundListener::tcp_listener(handler.clone(), dispatcher.clone(), addr);
             tasks.push(f);
         }
         if handler.has_udp() {
-            let f =
-                InboundListener::udp_listener(handler.clone(), dispatcher.clone(), addr);
+            let f = InboundListener::udp_listener(handler.clone(), dispatcher.clone(), addr, nat);
             tasks.push(f);
         }
         Ok(tasks)
@@ -64,16 +65,16 @@ impl InboundListener {
                                 destination: Address::Ip(addr),
                                 network: Network::TCP,
                                 local_peer: local,
-                                peer_address: conn.peer_addr().expect("peer")
+                                peer_address: conn.peer_addr().expect("peer"),
                             };
                             match TcpInboundHandlerTrait::handle(&*handler, session, conn).await {
                                 Ok(InboundResult::Stream(stream, mut sess)) => {
                                     dispatcher.dispatch_tcp(stream, &mut sess).await;
                                 }
-                                Ok(InboundResult::Datagram(socket, sess)) => {
-                                    dispatcher.dispatch_udp(socket, sess).await;
+                                Ok(InboundResult::Datagram(socket)) => {
+                                    // dispatcher.dispatch_udp(socket, sess).await;
                                 }
-                                Ok(InboundResult::NOT_SUPPORTED) => {
+                                Ok(InboundResult::NotSupported) => {
                                     error!("not supported");
                                 }
                                 Err(err) => {
@@ -87,22 +88,83 @@ impl InboundListener {
                         return;
                     }
                 }
-
             }
-        }.boxed();
+        }
+        .boxed();
         task
     }
     fn udp_listener(
-        _handler: AnyInboundHandler,
-        _dispatcher: Arc<Dispatcher>,
+        handler: AnyInboundHandler,
+        dispatcher: Arc<Dispatcher>,
         addr: SocketAddr,
+        nat: Arc<UdpAssociationManager>,
     ) -> TaskFuture {
         let future = async move {
-            let _listener = UdpSocket::bind(addr).await.unwrap();
-            info!("Udp listen at {}", addr);
-            ()
-        }.boxed();
-        // todo!("udp listener")
+            let socket = UdpSocket::bind(addr).await.unwrap();
+            info!("Udp listening at {}", addr);
+            match UdpInboundHandlerTrait::handle(handler.as_ref(), socket).await {
+                Ok(res) => {
+                    match res {
+                        InboundResult::Datagram(send_recv_socket) => {
+                            tokio::spawn(async move {
+                                let mut buf = vec![0u8; 1024];
+                                let (source_addr, real_addr) =
+                                    match send_recv_socket.recv_from(&mut buf).await {
+                                        Ok(x) => x,
+                                        Err(err) => {
+                                            debug!("{}", err);
+                                            return;
+                                        }
+                                    };
+                                let (sender, mut receiver) =
+                                    tokio::sync::mpsc::channel::<Vec<u8>>(100);
+                                let send_recv_socket1 = send_recv_socket.clone();
+                                tokio::spawn(async move {
+                                    // inbound <- send <- tunnel <- recv <- outbound
+                                    loop {
+                                        let res = match receiver.recv().await {
+                                            Some(x) => x,
+                                            None => {
+                                                // closed
+                                                debug!("{} closed channel", &source_addr);
+                                                return;
+                                            }
+                                        };
+                                        match send_recv_socket1
+                                        .send_to(res.as_ref(), source_addr.clone())
+                                            .await
+                                        {
+                                            Ok(_) => {}
+                                            Err(err) => {
+                                                debug!("{}", err);
+                                                return;
+                                            }
+                                        }
+                                    }
+                                });
+                                let packet = UdpPacket {
+                                    data: buf,
+                                    dest: real_addr.clone(),
+                                };
+                                match nat
+                                    .send_packet(real_addr, source_addr, packet, sender)
+                                    .await
+                                {
+                                    Ok(_) => {}
+                                    Err(err) => {
+                                        debug!("{}", err);
+                                    }
+                                }
+                            });
+                        }
+                        InboundResult::Stream(stream, sess) => {}
+                        InboundResult::NotSupported => {}
+                    }
+                }
+                Err(err) => {}
+            }
+        }
+        .boxed();
         future
     }
 }
